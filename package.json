@@ -1,0 +1,27 @@
+{
+  "name": "accessible-terminal",
+  "version": "1.0.0",
+  "description": "Minimal browser-based terminal (xterm.js + node-pty) built for screen reader accessibility.",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "ts-node src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@xterm/xterm": "^5.5.0",
+    "express": "^4.19.2",
+    "node-pty": "^1.0.0",
+    "ws": "^8.17.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.0",
+    "@types/ws": "^8.5.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.4"
+  },
+  "allowScripts": {
+    "node-pty@1.1.0": true
+  }
+}

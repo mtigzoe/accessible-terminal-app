@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Accessible Terminal</title>
+<link rel="stylesheet" href="/vendor/xterm/css/xterm.css" />
+<script src="/vendor/xterm/lib/xterm.js"></script>
+<style>
+  :root {
+    --bg: #0c0c0c;
+    --panel: #161616;
+    --text: #e6e6e6;
+    --accent: #4fc1e9;
+    --border: #333;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px;
+    background: var(--panel);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, sans-serif;
+  }
+  main { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 1.25rem; margin-bottom: 4px; }
+  .status { color: #999; font-size: 0.9rem; margin-bottom: 16px; }
+  #terminal-container {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px;
+  }
+  #terminal { height: 480px; }
+  kbd {
+    background: #333;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: Consolas, monospace;
+    font-size: 0.9em;
+  }
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .accessible-view {
+    margin-top: 16px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+  }
+  .accessible-view[hidden] { display: none; }
+  .accessible-view-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+    color: #a8a8a8;
+    font-size: 0.85rem;
+  }
+  .accessible-view textarea {
+    width: 100%;
+    height: 380px;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 14px;
+    padding: 8px;
+    resize: vertical;
+  }
+  .accessible-view button {
+    background: #2a2a2a;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 10px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Accessible Terminal</h1>
+  <p class="status" id="status">Connecting&hellip;</p>
+  <div id="terminal-container">
+    <div id="terminal" role="group" aria-label="Terminal"></div>
+  </div>
+
+  <p class="status">
+    From the terminal, press <kbd>Alt</kbd>+<kbd>F2</kbd> to open a read-only
+    accessible view of the buffer. Inside it: <kbd>Alt</kbd>+<kbd>Up</kbd> /
+    <kbd>Alt</kbd>+<kbd>Down</kbd> jumps between commands (PowerShell only),
+    <kbd>Esc</kbd> returns to the terminal.
+  </p>
+
+  <section id="accessible-view" class="accessible-view" hidden aria-label="Terminal buffer, read-only accessible view">
+    <div class="accessible-view-header">
+      <span>Accessible view (read-only)</span>
+      <button type="button" id="close-accessible-view">Close</button>
+    </div>
+    <textarea id="accessible-view-content" readonly aria-label="Terminal buffer contents, read only"></textarea>
+  </section>
+
+  <div id="sr-status" class="visually-hidden" role="status" aria-live="assertive"></div>
+</main>
+
+<script>
+  const statusEl = document.getElementById('status');
+
+  const term = new Terminal({
+    screenReaderMode: true,
+    cursorBlink: true,
+    fontFamily: 'Consolas, "Courier New", monospace',
+    fontSize: 14,
+    cols: 90,
+    rows: 24,
+    scrollback: 5000,
+    theme: {
+      background: '#0c0c0c',
+      foreground: '#e6e6e6',
+      cursor: '#4fc1e9'
+    }
+  });
+
+  term.open(document.getElementById('terminal'));
+  term.focus();
+
+  // --- Command markers (from the PowerShell shell-integration script) ---
+  // Each entry: { line: <absolute buffer line where the prompt started>, success: <bool> }
+  const commandMarkers = [];
+  let lastCommandOk = true;
+
+  // OSC 633 is the (informal) convention VS Code's shell integration uses.
+  // xterm.js consumes these sequences silently - nothing is displayed.
+  term.parser.registerOscHandler(633, (data) => {
+    const parts = data.split(';');
+    if (parts[0] === 'A') {
+      const buffer = term.buffer.active;
+      commandMarkers.push({
+        line: buffer.baseY + buffer.cursorY,
+        success: lastCommandOk
+      });
+    } else if (parts[0] === 'D') {
+      lastCommandOk = parts[1] === '0';
+    }
+    return true;
+  });
+
+  // --- Accessible view (a static, read-only snapshot of the buffer) ---
+  const accessibleView = document.getElementById('accessible-view');
+  const accessibleViewContent = document.getElementById('accessible-view-content');
+  const closeButton = document.getElementById('close-accessible-view');
+  const srStatus = document.getElementById('sr-status');
+  let currentLineOffsets = [];
+
+  function announce(text) {
+    srStatus.textContent = '';
+    // Re-set on the next tick so screen readers announce it even if the
+    // text is identical to what was there before.
+    setTimeout(() => { srStatus.textContent = text; }, 30);
+  }
+
+  function buildBufferSnapshot() {
+    const buffer = term.buffer.active;
+    const lines = [];
+    const lineOffsets = [];
+    let offset = 0;
+    for (let i = 0; i < buffer.length; i++) {
+      lineOffsets[i] = offset;
+      const line = buffer.getLine(i);
+      const text = line ? line.translateToString(true) : '';
+      lines.push(text);
+      offset += text.length + 1; // +1 accounts for the '\n' joining lines
+    }
+    return { text: lines.join('\n'), lineOffsets };
+  }
+
+  function openAccessibleView() {
+    const { text, lineOffsets } = buildBufferSnapshot();
+    currentLineOffsets = lineOffsets;
+    accessibleViewContent.value = text;
+    accessibleView.hidden = false;
+    accessibleViewContent.focus();
+    const end = text.length;
+    accessibleViewContent.setSelectionRange(end, end);
+    accessibleViewContent.scrollTop = accessibleViewContent.scrollHeight;
+    announce('Accessible view opened, showing the terminal buffer as read-only text. Alt+Up or Alt+Down jumps between commands. Escape returns to the terminal.');
+  }
+
+  function closeAccessibleView() {
+    accessibleView.hidden = true;
+    term.focus();
+    announce('Returned to the terminal.');
+  }
+
+  function jumpToCommand(direction) {
+    if (commandMarkers.length === 0) {
+      announce('No command markers yet - this requires the PowerShell shell-integration script.');
+      return;
+    }
+
+    const pos = accessibleViewContent.selectionStart;
+    const currentLine = accessibleViewContent.value.slice(0, pos).split('\n').length - 1;
+
+    let targetIndex;
+    if (direction === 'down') {
+      targetIndex = commandMarkers.findIndex(m => m.line > currentLine);
+      if (targetIndex === -1) targetIndex = commandMarkers.length - 1;
+    } else {
+      targetIndex = 0;
+      for (let i = 0; i < commandMarkers.length; i++) {
+        if (commandMarkers[i].line < currentLine) targetIndex = i;
+        else break;
+      }
+    }
+
+    const marker = commandMarkers[targetIndex];
+    const charOffset = currentLineOffsets[marker.line] ?? 0;
+    accessibleViewContent.setSelectionRange(charOffset, charOffset);
+    const lineHeight = parseInt(getComputedStyle(accessibleViewContent).lineHeight, 10) || 18;
+    accessibleViewContent.scrollTop = Math.max(0, (marker.line - 3) * lineHeight);
+
+    announce(`Command ${targetIndex + 1} of ${commandMarkers.length}, previous command ${marker.success ? 'succeeded' : 'failed'}`);
+  }
+
+  accessibleView.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeAccessibleView();
+    } else if (e.altKey && e.key === 'F2') {
+      e.preventDefault();
+      closeAccessibleView();
+    } else if (e.altKey && e.key === 'ArrowUp') {
+      e.preventDefault();
+      jumpToCommand('up');
+    } else if (e.altKey && e.key === 'ArrowDown') {
+      e.preventDefault();
+      jumpToCommand('down');
+    }
+  });
+
+  closeButton.addEventListener('click', closeAccessibleView);
+
+  // Intercept Alt+F2 before xterm.js sends it to the shell.
+  term.attachCustomKeyEventHandler((event) => {
+    if (event.type === 'keydown' && event.altKey && event.key === 'F2') {
+      event.preventDefault();
+      openAccessibleView();
+      return false;
+    }
+    return true;
+  });
+
+  const protocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
+  const socket = new WebSocket(protocol + location.host + '/ws');
+
+  socket.addEventListener('open', () => {
+    statusEl.textContent = 'Connected';
+    socket.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+  });
+
+  socket.addEventListener('message', (event) => {
+    term.write(event.data);
+  });
+
+  socket.addEventListener('close', () => {
+    statusEl.textContent = 'Disconnected';
+    term.write('\r\n\x1b[31m[connection closed]\x1b[0m\r\n');
+  });
+
+  socket.addEventListener('error', () => {
+    statusEl.textContent = 'Connection error';
+  });
+
+  term.onData((data) => {
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(data);
+    }
+  });
+</script>
+</body>
+</html>
