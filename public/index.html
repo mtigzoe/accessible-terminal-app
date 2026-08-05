@@ -205,6 +205,26 @@
     announce('Returned to the terminal.');
   }
 
+  function getCommandTextForMarker(markerIndex) {
+    const marker = commandMarkers[markerIndex];
+    if (!marker) return '';
+
+    const buffer = term.buffer.active;
+    const line = buffer.getLine(marker.line);
+    if (!line) return '';
+
+    let text = line.translateToString(true).trimEnd();
+
+    // Strip the typical PowerShell prompt produced by the integration script.
+    // Matches "PS C:\\path>" or "PS C:\\path>>" (nested) and any trailing spaces.
+    const promptMatch = text.match(/^PS\s+.*>+\s*/);
+    if (promptMatch) {
+      text = text.slice(promptMatch[0].length);
+    }
+
+    return text.trim() || 'empty';
+  }
+
   function jumpToCommand(direction) {
     if (commandMarkers.length === 0) {
       announce('No command markers yet - this requires the PowerShell shell-integration script.');
@@ -232,7 +252,8 @@
     const lineHeight = parseInt(getComputedStyle(accessibleViewContent).lineHeight, 10) || 18;
     accessibleViewContent.scrollTop = Math.max(0, (marker.line - 3) * lineHeight);
 
-    announce(`Command ${targetIndex + 1} of ${commandMarkers.length}, previous command ${marker.success ? 'succeeded' : 'failed'}`);
+    const commandText = getCommandTextForMarker(targetIndex);
+    announce(`Command ${targetIndex + 1} of ${commandMarkers.length}, ${marker.success ? 'succeeded' : 'failed'}: ${commandText}`);
   }
 
   accessibleView.addEventListener('keydown', (e) => {
@@ -250,23 +271,6 @@
       jumpToCommand('down');
     }
   });
-
-  function getCommandTextForMarker(markerIndex) {
-    const marker = commandMarkers[markerIndex];
-    const buffer = term.buffer.active;
-    const startLine = marker.line + 1;
-    const endLine = markerIndex < commandMarkers.length - 1
-      ? commandMarkers[markerIndex + 1].line
-      : buffer.length;
-    const lines = [];
-    for (let i = startLine; i < endLine; i++) {
-      const line = buffer.getLine(i);
-      if (line) {
-        lines.push(line.translateToString());
-      }
-    }
-    return lines.join('\n').trim();
-  }
 
   closeButton.addEventListener('click', closeAccessibleView);
 
@@ -320,7 +324,7 @@
 
       const marker = commandMarkers[terminalHistoryIndex];
       const commandText = getCommandTextForMarker(terminalHistoryIndex);
-      announce(`Command ${terminalHistoryIndex + 1} of ${commandMarkers.length}, ${marker.success ? 'succeeded' : 'failed'}: ${commandText || 'empty'}`);
+      announce(`Command ${terminalHistoryIndex + 1} of ${commandMarkers.length}, ${marker.success ? 'succeeded' : 'failed'}: ${commandText}`);
 
       if (socket.readyState === WebSocket.OPEN) {
         socket.send(e.key === 'ArrowUp' ? '\x1b[A' : '\x1b[B');
