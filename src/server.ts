@@ -14,12 +14,12 @@ app.use('/vendor/xterm', express.static(path.join(__dirname, '..', 'node_modules
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 
-// Same default shell + working directory a freshly opened terminal would use.
-// On Windows, node-pty's ConPTY backend needs a fully resolved path — it does not
-// search PATH the way a shell does, so a bare "powershell.exe" can fail to launch.
+// On Windows, use PowerShell 7 (pwsh.exe). It is resolved from PATH.
+// On Linux/macOS, use the user's default shell.
 const shell = process.platform === 'win32'
-  ? path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+  ? 'pwsh.exe'
   : process.env.SHELL || 'bash';
+
 const defaultCwd = os.homedir();
 
 // On Windows, load the shell-integration script so the browser side can find
@@ -27,6 +27,7 @@ const defaultCwd = os.homedir();
 // jump-to-previous/next-command navigation). -ExecutionPolicy Bypass only
 // affects this one process, not the user's system-wide policy.
 const shellIntegrationScript = path.join(__dirname, '..', 'shell-integration', 'pwsh-integration.ps1');
+
 const shellArgs = process.platform === 'win32'
   ? ['-NoLogo', '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', shellIntegrationScript]
   : [];
@@ -58,6 +59,7 @@ wss.on('connection', (ws: WebSocket) => {
 
     try {
       const parsed = JSON.parse(text);
+
       if (parsed && parsed.type === 'resize' && parsed.cols && parsed.rows) {
         ptyProcess.resize(parsed.cols, parsed.rows);
         handledAsControlMessage = true;
@@ -77,6 +79,7 @@ wss.on('connection', (ws: WebSocket) => {
 });
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
+
 server.listen(PORT, () => {
   console.log(`Accessible terminal running at http://localhost:${PORT}`);
   console.log(`Shell: ${shell}   Working directory: ${defaultCwd}`);
