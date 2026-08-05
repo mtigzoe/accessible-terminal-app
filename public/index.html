@@ -525,9 +525,6 @@
   }
 
   function requestTabCompletion(direction) {
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-      return;
-    }
     if (commandRunning) {
       announce('Wait for the current command to finish.');
       return;
@@ -549,29 +546,57 @@
         ? commandEl.selectionStart
         : line.length;
 
+    // Snapshot the line at Tab time — used for ReplacementIndex/Length.
+    const baseLine = line;
     completionPending = true;
     completionRequestId += 1;
     const id = completionRequestId;
 
-    socket.send(
-      JSON.stringify({
-        type: 'complete',
+    // HTTP on purpose: must never go over the shell WebSocket (that was
+    // typing the JSON into PowerShell and breaking the session).
+    fetch('/api/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         id: id,
         line: line,
         cursor: cursor,
         cwd: currentPath || undefined
       })
-    );
+    })
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error('Completion request failed (' + response.status + ').');
+        }
+        return response.json();
+      })
+      .then(function (msg) {
+        handleCompleteResult(msg, baseLine);
+      })
+      .catch(function (err) {
+        completionPending = false;
+        resetCompletion();
+        announce(
+          err && err.message
+            ? err.message
+            : 'Completion request failed. Is the server running the latest code?'
+        );
+      });
   }
 
-  function handleCompleteResult(msg) {
+  function handleCompleteResult(msg, baseLine) {
     completionPending = false;
 
-    if (msg.id !== completionRequestId) {
+    if (msg && msg.id != null && msg.id !== completionRequestId) {
       return;
     }
 
-    const matches = Array.isArray(msg.matches) ? msg.matches : [];
+    const matches = Array.isArray(msg.matches)
+      ? msg.matches
+      : typeof msg.matches === 'string'
+        ? [msg.matches]
+        : [];
+
     if (matches.length === 0) {
       resetCompletion();
       announce(msg.error ? 'No completions. ' + msg.error : 'No completions.');
@@ -580,7 +605,7 @@
 
     // Keep the line as it was when Tab was pressed so cycling replaces
     // the same span each time (PowerShell ReplacementIndex/Length).
-    completion.baseLine = commandEl.value;
+    completion.baseLine = typeof baseLine === 'string' ? baseLine : commandEl.value;
     completion.replacementIndex =
       typeof msg.replacementIndex === 'number' ? msg.replacementIndex : 0;
     completion.replacementLength =
@@ -629,17 +654,6 @@
 
   socket.addEventListener('message', function (event) {
     const data = typeof event.data === 'string' ? event.data : String(event.data);
-
-    // Completion replies are JSON; shell output is raw text.
-    if (data.indexOf('{"type":"completeResult"') === 0) {
-      try {
-        handleCompleteResult(JSON.parse(data));
-        return;
-      } catch (e) {
-        // fall through to normal output handling
-      }
-    }
-
     handleIncoming(data);
   });
 

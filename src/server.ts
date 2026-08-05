@@ -9,6 +9,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 const pty = require('node-pty');
 
 const app = express();
+app.use(express.json({ limit: '64kb' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 const server = http.createServer(app);
@@ -226,39 +227,59 @@ function getBasicPathCompletions(
   return { replacementIndex, replacementLength, matches };
 }
 
-async function handleComplete(ws: WebSocket, parsed: CompleteRequest): Promise<void> {
-  const line = typeof parsed.line === 'string' ? parsed.line : '';
-  const cursor = typeof parsed.cursor === 'number' ? parsed.cursor : line.length;
-  const cwd = resolveCwd(parsed.cwd);
-  const id = typeof parsed.id === 'number' ? parsed.id : null;
-
-  let result: Omit<CompleteResult, 'type' | 'id'>;
+async function runComplete(
+  line: string,
+  cursor: number,
+  cwd: string
+): Promise<Omit<CompleteResult, 'type' | 'id'>> {
   try {
     if (process.platform === 'win32') {
-      result = await getPowerShellCompletions(line, cursor, cwd);
-    } else {
-      result = getBasicPathCompletions(line, cursor, cwd);
+      return await getPowerShellCompletions(line, cursor, cwd);
     }
+    return getBasicPathCompletions(line, cursor, cwd);
   } catch (e) {
-    result = {
+    return {
       replacementIndex: cursor,
       replacementLength: 0,
       matches: [],
       error: e instanceof Error ? e.message : String(e)
     };
   }
+}
 
-  if (ws.readyState === WebSocket.OPEN) {
-    const payload: CompleteResult = {
-      type: 'completeResult',
-      id,
-      replacementIndex: result.replacementIndex,
-      replacementLength: result.replacementLength,
-      matches: result.matches,
-      error: result.error
-    };
-    ws.send(JSON.stringify(payload));
+/**
+ * Tab completion is HTTP — never the shell WebSocket — so a complete request
+ * cannot be mistaken for keystrokes and pasted into PowerShell.
+ */
+app.post('/api/complete', async (req, res) => {
+  const line = typeof req.body?.line === 'string' ? req.body.line : '';
+  const cursor = typeof req.body?.cursor === 'number' ? req.body.cursor : line.length;
+  const cwd = resolveCwd(req.body?.cwd);
+  const id = typeof req.body?.id === 'number' ? req.body.id : null;
+
+  const result = await runComplete(line, cursor, cwd);
+  const payload: CompleteResult = {
+    type: 'completeResult',
+    id,
+    replacementIndex: result.replacementIndex,
+    replacementLength: result.replacementLength,
+    matches: result.matches,
+    error: result.error
+  };
+  res.json(payload);
+});
+
+function rawDataToString(raw: WebSocket.RawData): string {
+  if (typeof raw === 'string') {
+    return raw;
   }
+  if (Buffer.isBuffer(raw)) {
+    return raw.toString('utf8');
+  }
+  if (Array.isArray(raw)) {
+    return Buffer.concat(raw).toString('utf8');
+  }
+  return Buffer.from(raw).toString('utf8');
 }
 
 wss.on('connection', (ws: WebSocket) => {
@@ -282,27 +303,32 @@ wss.on('connection', (ws: WebSocket) => {
     }
   });
 
-  ws.on('message', (raw: Buffer) => {
-    const text = raw.toString();
-    let handledAsControlMessage = false;
+  ws.on('message', (raw: WebSocket.RawData) => {
+    const text = rawDataToString(raw);
 
-    try {
-      const parsed = JSON.parse(text);
+    // Any JSON object with a "type" field is a control message — never shell input.
+    // (Prevents accidents like tab-complete payloads being typed into PowerShell.)
+    if (text.length > 0 && text.charAt(0) === '{') {
+      try {
+        const parsed = JSON.parse(text) as { type?: string; cols?: number; rows?: number };
 
-      if (parsed && parsed.type === 'resize' && parsed.cols && parsed.rows) {
-        ptyProcess.resize(parsed.cols, parsed.rows);
-        handledAsControlMessage = true;
-      } else if (parsed && parsed.type === 'complete') {
-        handledAsControlMessage = true;
-        void handleComplete(ws, parsed as CompleteRequest);
+        if (parsed && typeof parsed === 'object' && typeof parsed.type === 'string') {
+          if (
+            parsed.type === 'resize' &&
+            typeof parsed.cols === 'number' &&
+            typeof parsed.rows === 'number'
+          ) {
+            ptyProcess.resize(parsed.cols, parsed.rows);
+          }
+          // Ignore unknown control types (including legacy "complete" over WS).
+          return;
+        }
+      } catch {
+        // Not valid JSON — treat as shell text below.
       }
-    } catch {
-      // Not JSON — normal command text, fall through and write it.
     }
 
-    if (!handledAsControlMessage) {
-      ptyProcess.write(text);
-    }
+    ptyProcess.write(text);
   });
 
   ws.on('close', () => {
