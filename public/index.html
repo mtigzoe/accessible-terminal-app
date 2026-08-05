@@ -100,9 +100,9 @@
 
   <p class="status">
     From the terminal, press <kbd>Alt</kbd>+<kbd>F2</kbd> to open a read-only
-    accessible view of the buffer. Inside it: <kbd>Alt</kbd>+<kbd>Up</kbd> /
-    <kbd>Alt</kbd>+<kbd>Down</kbd> jumps between commands (PowerShell only),
-    <kbd>Esc</kbd> returns to the terminal.
+    accessible view of the buffer. In the terminal or the accessible view:
+    <kbd>Up</kbd> / <kbd>Down</kbd> jumps between previous commands (PowerShell only)
+    and announces the command. <kbd>Esc</kbd> returns to the terminal.
   </p>
 
   <section id="accessible-view" class="accessible-view" hidden aria-label="Terminal buffer, read-only accessible view">
@@ -141,6 +141,7 @@
   // Each entry: { line: <absolute buffer line where the prompt started>, success: <bool> }
   const commandMarkers = [];
   let lastCommandOk = true;
+  let terminalHistoryIndex = -1;
 
   // OSC 633 is the (informal) convention VS Code's shell integration uses.
   // xterm.js consumes these sequences silently - nothing is displayed.
@@ -152,6 +153,7 @@
         line: buffer.baseY + buffer.cursorY,
         success: lastCommandOk
       });
+      terminalHistoryIndex = commandMarkers.length - 1;
     } else if (parts[0] === 'D') {
       lastCommandOk = parts[1] === '0';
     }
@@ -167,8 +169,6 @@
 
   function announce(text) {
     srStatus.textContent = '';
-    // Re-set on the next tick so screen readers announce it even if the
-    // text is identical to what was there before.
     setTimeout(() => { srStatus.textContent = text; }, 30);
   }
 
@@ -196,7 +196,7 @@
     const end = text.length;
     accessibleViewContent.setSelectionRange(end, end);
     accessibleViewContent.scrollTop = accessibleViewContent.scrollHeight;
-    announce('Accessible view opened, showing the terminal buffer as read-only text. Alt+Up or Alt+Down jumps between commands. Escape returns to the terminal.');
+    announce('Accessible view opened, showing the terminal buffer as read-only text. Up or Down arrows jump between commands. Escape returns to the terminal.');
   }
 
   function closeAccessibleView() {
@@ -242,26 +242,33 @@
     } else if (e.altKey && e.key === 'F2') {
       e.preventDefault();
       closeAccessibleView();
-    } else if (e.altKey && e.key === 'ArrowUp') {
+    } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       jumpToCommand('up');
-    } else if (e.altKey && e.key === 'ArrowDown') {
+    } else if (e.key === 'ArrowDown') {
       e.preventDefault();
       jumpToCommand('down');
     }
   });
 
-  closeButton.addEventListener('click', closeAccessibleView);
-
-  // Intercept Alt+F2 before xterm.js sends it to the shell.
-  term.attachCustomKeyEventHandler((event) => {
-    if (event.type === 'keydown' && event.altKey && event.key === 'F2') {
-      event.preventDefault();
-      openAccessibleView();
-      return false;
+  function getCommandTextForMarker(markerIndex) {
+    const marker = commandMarkers[markerIndex];
+    const buffer = term.buffer.active;
+    const startLine = marker.line + 1;
+    const endLine = markerIndex < commandMarkers.length - 1
+      ? commandMarkers[markerIndex + 1].line
+      : buffer.length;
+    const lines = [];
+    for (let i = startLine; i < endLine; i++) {
+      const line = buffer.getLine(i);
+      if (line) {
+        lines.push(line.translateToString());
+      }
     }
-    return true;
-  });
+    return lines.join('\n').trim();
+  }
+
+  closeButton.addEventListener('click', closeAccessibleView);
 
   const protocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
   const socket = new WebSocket(protocol + location.host + '/ws');
@@ -289,6 +296,37 @@
       socket.send(data);
     }
   });
+
+  term.element.addEventListener('keydown', (e) => {
+    if (e.altKey && e.key === 'F2') {
+      e.preventDefault();
+      openAccessibleView();
+    } else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && commandMarkers.length > 0) {
+      e.preventDefault();
+
+      if (terminalHistoryIndex < 0) {
+        terminalHistoryIndex = commandMarkers.length - 1;
+      }
+
+      if (e.key === 'ArrowUp') {
+        if (terminalHistoryIndex > 0) {
+          terminalHistoryIndex--;
+        }
+      } else {
+        if (terminalHistoryIndex < commandMarkers.length - 1) {
+          terminalHistoryIndex++;
+        }
+      }
+
+      const marker = commandMarkers[terminalHistoryIndex];
+      const commandText = getCommandTextForMarker(terminalHistoryIndex);
+      announce(`Command ${terminalHistoryIndex + 1} of ${commandMarkers.length}, ${marker.success ? 'succeeded' : 'failed'}: ${commandText || 'empty'}`);
+
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(e.key === 'ArrowUp' ? '\x1b[A' : '\x1b[B');
+      }
+    }
+  }, true);
 </script>
 </body>
 </html>
