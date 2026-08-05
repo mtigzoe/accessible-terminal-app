@@ -1,7 +1,7 @@
 {
   "name": "accessible-terminal",
   "version": "1.0.0",
-  "description": "Minimal browser-based terminal (xterm.js + node-pty) built for screen reader accessibility.",
+  "description": "Simple form-based PowerShell UI (path, output, command) built for screen reader accessibility.",
   "main": "dist/server.js",
   "scripts": {
     "dev": "ts-node src/server.ts",
@@ -9,7 +9,6 @@
     "start": "node dist/server.js"
   },
   "dependencies": {
-    "@xterm/xterm": "^6.0.0",
     "express": "^4.19.2",
     "node-pty": "^1.0.0",
     "ws": "^8.17.0"

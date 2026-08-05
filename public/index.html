@@ -2,43 +2,204 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Accessible Terminal</title>
-<link rel="stylesheet" href="/vendor/xterm/css/xterm.css" />
-<script src="/vendor/xterm/lib/xterm.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Accessible PowerShell</title>
 <style>
   :root {
     --bg: #0c0c0c;
     --panel: #161616;
     --text: #e6e6e6;
+    --muted: #a0a0a0;
     --accent: #4fc1e9;
     --border: #333;
+    --focus: #4fc1e9;
+    --error: #f48771;
+    --ok: #89d185;
   }
-  * { box-sizing: border-box; }
+
+  * {
+    box-sizing: border-box;
+  }
+
   body {
     margin: 0;
     padding: 24px;
     background: var(--panel);
     color: var(--text);
     font-family: "Segoe UI", system-ui, sans-serif;
+    line-height: 1.4;
+    max-width: 56rem;
   }
-  main { max-width: 900px; margin: 0 auto; }
-  h1 { font-size: 1.25rem; margin-bottom: 4px; }
-  .status { color: #999; font-size: 0.9rem; margin-bottom: 16px; }
-  #terminal-container {
+
+  h1 {
+    font-size: 1.35rem;
+    font-weight: 600;
+    margin: 0 0 4px;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    margin: 0 0 20px;
+    font-size: 0.95rem;
+  }
+
+  .panel {
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 6px;
-    padding: 8px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
   }
-  #terminal { height: 480px; }
-  kbd {
+
+  .panel h2 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    margin: 0 0 8px;
+  }
+
+  #path-value {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 1.05rem;
+    word-break: break-all;
+  }
+
+  #output {
+    display: block;
+    width: 100%;
+    min-height: 320px;
+    height: 45vh;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 14px;
+    line-height: 1.35;
+    padding: 10px;
+    resize: vertical;
+    white-space: pre;
+    overflow-wrap: normal;
+    overflow-x: auto;
+  }
+
+  #output:focus {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .command-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .command-field {
+    flex: 1 1 16rem;
+    min-width: 0;
+  }
+
+  label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+  }
+
+  #command {
+    width: 100%;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 15px;
+    padding: 10px 12px;
+  }
+
+  #command:focus {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-color: var(--focus);
+  }
+
+  .actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  button {
+    background: #2a2a2a;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 14px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-family: inherit;
+  }
+
+  button.primary {
+    background: #1e4d6b;
+    border-color: #2a6a90;
+  }
+
+  button:hover {
+    border-color: var(--accent);
+  }
+
+  button:focus {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .hints {
+    margin-top: 16px;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  .hints ul {
+    margin: 6px 0 0;
+    padding-left: 1.2rem;
+  }
+
+  .hints kbd {
     background: #333;
     border: 1px solid #555;
     border-radius: 4px;
     padding: 1px 6px;
     font-family: Consolas, monospace;
     font-size: 0.9em;
+    color: var(--text);
   }
+
+  .connection {
+    font-size: 0.9rem;
+    margin-bottom: 12px;
+  }
+
+  .connection[data-state="connected"] {
+    color: var(--ok);
+  }
+
+  .connection[data-state="disconnected"],
+  .connection[data-state="error"] {
+    color: var(--error);
+  }
+
   .visually-hidden {
     position: absolute;
     width: 1px;
@@ -50,287 +211,535 @@
     white-space: nowrap;
     border: 0;
   }
-  .accessible-view {
-    margin-top: 16px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 12px;
-  }
-  .accessible-view[hidden] { display: none; }
-  .accessible-view-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 8px;
-    color: #a8a8a8;
-    font-size: 0.85rem;
-  }
-  .accessible-view textarea {
-    width: 100%;
-    height: 380px;
-    background: var(--bg);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    font-family: Consolas, "Courier New", monospace;
-    font-size: 14px;
-    padding: 8px;
-    resize: vertical;
-  }
-  .accessible-view button {
-    background: #2a2a2a;
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 4px 10px;
-    cursor: pointer;
-    flex-shrink: 0;
-  }
 </style>
 </head>
 <body>
-<main>
-  <h1>Accessible Terminal</h1>
-  <p class="status" id="status">Connecting&hellip;</p>
-  <div id="terminal-container">
-    <div id="terminal" role="group" aria-label="Terminal"></div>
-  </div>
+  <header>
+    <h1>Accessible PowerShell</h1>
+    <p class="subtitle">
+      Simple screen-reader friendly shell: current path, output history, and a command box.
+    </p>
+    <p
+      id="connection-status"
+      class="connection"
+      data-state="connecting"
+      role="status"
+      aria-live="polite">
+      Connecting…
+    </p>
+  </header>
 
-  <p class="status">
-    From the terminal, press <kbd>Alt</kbd>+<kbd>F2</kbd> to open a read-only
-    accessible view of the buffer. In the terminal or the accessible view:
-    <kbd>Up</kbd> / <kbd>Down</kbd> jumps between previous commands (PowerShell only)
-    and announces the command. <kbd>Esc</kbd> returns to the terminal.
-  </p>
+  <main>
+    <!-- 1. Current path -->
+    <section class="panel" aria-labelledby="path-heading">
+      <h2 id="path-heading">Current path</h2>
+      <p id="path-value" aria-live="polite">Waiting for shell…</p>
+    </section>
 
-  <section id="accessible-view" class="accessible-view" hidden aria-label="Terminal buffer, read-only accessible view">
-    <div class="accessible-view-header">
-      <span>Accessible view (read-only)</span>
-      <button type="button" id="close-accessible-view">Close</button>
-    </div>
-    <textarea id="accessible-view-content" readonly aria-label="Terminal buffer contents, read only"></textarea>
-  </section>
+    <!-- 2. Output -->
+    <section class="panel" aria-labelledby="output-heading">
+      <h2 id="output-heading">Output</h2>
+      <textarea
+        id="output"
+        readonly
+        spellcheck="false"
+        aria-label="Command output history. Read-only."
+        aria-describedby="output-help"></textarea>
+      <p id="output-help" class="visually-hidden">
+        Scroll or use your screen reader’s browse mode to read previous commands and their results.
+      </p>
+    </section>
 
-  <div id="sr-status" class="visually-hidden" role="status" aria-live="assertive"></div>
-</main>
+    <!-- 3. Command field -->
+    <section class="panel" aria-labelledby="command-heading">
+      <h2 id="command-heading" class="visually-hidden">Command</h2>
+      <form id="command-form" class="command-row">
+        <div class="command-field">
+          <label for="command">Command</label>
+          <input
+            type="text"
+            id="command"
+            name="command"
+            autocomplete="off"
+            spellcheck="false"
+            aria-describedby="command-help"
+            disabled>
+        </div>
+        <div class="actions">
+          <button type="submit" id="run-btn" class="primary" disabled>Run</button>
+          <button type="button" id="clear-btn" disabled>Clear output</button>
+          <button type="button" id="focus-output-btn" disabled>Go to output</button>
+        </div>
+      </form>
+      <p id="command-help" class="visually-hidden">
+        Type a PowerShell command and press Enter to run it.
+        Press Tab to complete folder and command names.
+        Use Up and Down arrows for command history.
+      </p>
+    </section>
+  </main>
+
+  <aside class="hints" aria-labelledby="hints-heading">
+    <h2 id="hints-heading" class="visually-hidden">Keyboard tips</h2>
+    <ul>
+      <li><kbd>Enter</kbd> runs the command</li>
+      <li><kbd>Tab</kbd> completes paths and commands (like PowerShell); <kbd>Shift</kbd>+<kbd>Tab</kbd> cycles backward</li>
+      <li><kbd>Up</kbd> / <kbd>Down</kbd> recall previous commands</li>
+      <li><kbd>Alt</kbd>+<kbd>O</kbd> moves focus to output</li>
+      <li><kbd>Alt</kbd>+<kbd>C</kbd> moves focus to the command field</li>
+      <li><kbd>Escape</kbd> clears the command field</li>
+    </ul>
+  </aside>
+
+  <!-- Short status only — not the full command output (that lives in #output). -->
+  <div id="sr-status" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <script>
-  const statusEl = document.getElementById('status');
-
-  const term = new Terminal({
-    screenReaderMode: true,
-    cursorBlink: true,
-    fontFamily: 'Consolas, "Courier New", monospace',
-    fontSize: 14,
-    cols: 90,
-    rows: 24,
-    scrollback: 5000,
-    theme: {
-      background: '#0c0c0c',
-      foreground: '#e6e6e6',
-      cursor: '#4fc1e9'
-    }
-  });
-
-  term.open(document.getElementById('terminal'));
-  term.focus();
-
-  // --- Command markers (from the PowerShell shell-integration script) ---
-  // Each entry: { line: <absolute buffer line where the prompt started>, success: <bool> }
-  const commandMarkers = [];
-  let lastCommandOk = true;
-  let terminalHistoryIndex = -1;
-
-  // OSC 633 is the (informal) convention VS Code's shell integration uses.
-  // xterm.js consumes these sequences silently - nothing is displayed.
-  term.parser.registerOscHandler(633, (data) => {
-    const parts = data.split(';');
-    if (parts[0] === 'A') {
-      const buffer = term.buffer.active;
-      commandMarkers.push({
-        line: buffer.baseY + buffer.cursorY,
-        success: lastCommandOk
-      });
-      terminalHistoryIndex = commandMarkers.length - 1;
-    } else if (parts[0] === 'D') {
-      lastCommandOk = parts[1] === '0';
-    }
-    return true;
-  });
-
-  // --- Accessible view (a static, read-only snapshot of the buffer) ---
-  const accessibleView = document.getElementById('accessible-view');
-  const accessibleViewContent = document.getElementById('accessible-view-content');
-  const closeButton = document.getElementById('close-accessible-view');
+(function () {
+  const pathEl = document.getElementById('path-value');
+  const outputEl = document.getElementById('output');
+  const commandEl = document.getElementById('command');
+  const formEl = document.getElementById('command-form');
+  const runBtn = document.getElementById('run-btn');
+  const clearBtn = document.getElementById('clear-btn');
+  const focusOutputBtn = document.getElementById('focus-output-btn');
+  const connectionEl = document.getElementById('connection-status');
   const srStatus = document.getElementById('sr-status');
-  let currentLineOffsets = [];
+
+  const history = [];
+  let historyIndex = -1;
+  let draftBeforeHistory = '';
+
+  let rawBuffer = '';
+  let currentPath = '';
+  let lastExitOk = true;
+  let commandRunning = false;
+  let ready = false;
+  let pendingCommand = null;
+
+  // Tab completion state (PowerShell TabExpansion2 via the server)
+  let completionRequestId = 0;
+  let completionPending = false;
+  let applyingCompletion = false;
+  const completion = {
+    baseLine: '',
+    replacementIndex: 0,
+    replacementLength: 0,
+    matches: [],
+    index: 0
+  };
+
+  // Matches PowerShell prompts like: PS C:\Users\You>  or  PS C:\Users\You>>
+  const PROMPT_RE = /^PS\s+(.+?)(>+)\s*$/;
 
   function announce(text) {
     srStatus.textContent = '';
-    setTimeout(() => { srStatus.textContent = text; }, 30);
+    // Brief clear so the same message can be re-announced.
+    window.setTimeout(function () {
+      srStatus.textContent = text;
+    }, 40);
   }
 
-  function buildBufferSnapshot() {
-    const buffer = term.buffer.active;
-    const lines = [];
-    const lineOffsets = [];
-    let offset = 0;
-    for (let i = 0; i < buffer.length; i++) {
-      lineOffsets[i] = offset;
-      const line = buffer.getLine(i);
-      const text = line ? line.translateToString(true) : '';
-      lines.push(text);
-      offset += text.length + 1; // +1 accounts for the '\n' joining lines
+  function setConnection(state, message) {
+    connectionEl.dataset.state = state;
+    connectionEl.textContent = message;
+  }
+
+  function setControlsEnabled(enabled) {
+    commandEl.disabled = !enabled;
+    runBtn.disabled = !enabled;
+    clearBtn.disabled = !enabled;
+    focusOutputBtn.disabled = !enabled;
+  }
+
+  function setPath(path) {
+    if (!path || path === currentPath) {
+      return;
     }
-    return { text: lines.join('\n'), lineOffsets };
+    currentPath = path;
+    pathEl.textContent = path;
   }
 
-  function openAccessibleView() {
-    const { text, lineOffsets } = buildBufferSnapshot();
-    currentLineOffsets = lineOffsets;
-    accessibleViewContent.value = text;
-    accessibleView.hidden = false;
-    accessibleViewContent.focus();
-    const end = text.length;
-    accessibleViewContent.setSelectionRange(end, end);
-    accessibleViewContent.scrollTop = accessibleViewContent.scrollHeight;
-    announce('Accessible view opened, showing the terminal buffer as read-only text. Up or Down arrows jump between commands. Escape returns to the terminal.');
+  function appendOutput(text) {
+    if (!text) {
+      return;
+    }
+    // Avoid a leading blank line on first write.
+    if (outputEl.value) {
+      outputEl.value += text;
+    } else {
+      outputEl.value = text.replace(/^\n+/, '');
+    }
+    outputEl.scrollTop = outputEl.scrollHeight;
   }
 
-  function closeAccessibleView() {
-    accessibleView.hidden = true;
-    term.focus();
-    announce('Returned to the terminal.');
+  function stripAnsi(text) {
+    return text
+      // OSC sequences (including 633 shell integration), BEL-terminated
+      .replace(/\u001b\][^\u0007]*\u0007/g, '')
+      // CSI sequences (colors, cursor, etc.)
+      .replace(/\u001b\[[0-9;?]*[ -\/]*[@-~]/g, '')
+      // Other short ESC sequences
+      .replace(/\u001b./g, '')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      // Backspace-style overstrikes are rare after strip; drop leftover BEL/NUL
+      .replace(/[\u0000\u0007]/g, '');
   }
 
-  function getCommandTextForMarker(markerIndex) {
-    const marker = commandMarkers[markerIndex];
-    if (!marker) return '';
+  function processOscMarkers(chunk) {
+    // Pull OSC 633 markers out and react; leave the rest for display.
+    const oscRe = /\u001b\]633;([^\u0007]*)\u0007/g;
+    let match;
+    while ((match = oscRe.exec(chunk)) !== null) {
+      const parts = match[1].split(';');
+      const code = parts[0];
 
-    const buffer = term.buffer.active;
-    const line = buffer.getLine(marker.line);
-    if (!line) return '';
+      if (code === 'D') {
+        // Previous command finished. 0 = success.
+        lastExitOk = parts[1] === '0';
+      } else if (code === 'A') {
+        // New prompt is about to be written.
+        finishCommand();
+      }
+    }
+    // New regex instance so lastIndex from the loop above cannot skip matches.
+    return chunk.replace(/\u001b\]633;[^\u0007]*\u0007/g, '');
+  }
 
-    let text = line.translateToString(true).trimEnd();
+  function finishCommand() {
+    if (!commandRunning) {
+      return;
+    }
+    commandRunning = false;
+    const status = lastExitOk ? 'succeeded' : 'failed';
+    const label = pendingCommand ? pendingCommand : 'Command';
+    announce(label + ' ' + status + '.');
+    pendingCommand = null;
+    if (ready && socket.readyState === WebSocket.OPEN) {
+      runBtn.disabled = false;
+      commandEl.focus();
+    }
+  }
 
-    // Strip the typical PowerShell prompt produced by the integration script.
-    // Matches "PS C:\\path>" or "PS C:\\path>>" (nested) and any trailing spaces.
-    const promptMatch = text.match(/^PS\s+.*>+\s*/);
-    if (promptMatch) {
-      text = text.slice(promptMatch[0].length);
+  function onPromptSeen(path) {
+    setPath(path);
+    // Fallback when shell-integration markers are missing: prompt means idle.
+    finishCommand();
+    if (!ready) {
+      ready = true;
+      setControlsEnabled(true);
+      setConnection('connected', 'Connected to PowerShell.');
+      announce('Shell ready. Current path ' + path + '. Type a command.');
+      commandEl.focus();
+    }
+  }
+
+  function handleIncoming(data) {
+    rawBuffer += processOscMarkers(data);
+    const clean = stripAnsi(rawBuffer);
+
+    // Keep an incomplete trailing line in the buffer.
+    const lines = clean.split('\n');
+    rawBuffer = lines.pop() || '';
+
+    const displayLines = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const promptMatch = line.match(PROMPT_RE);
+
+      if (promptMatch) {
+        onPromptSeen(promptMatch[1]);
+        // Path is shown in its own region — skip bare prompts in output.
+        continue;
+      }
+
+      // Drop the shell's local echo of the command we already printed.
+      if (
+        commandRunning &&
+        pendingCommand &&
+        line.trim() === pendingCommand
+      ) {
+        continue;
+      }
+
+      displayLines.push(line);
     }
 
-    return text.trim() || 'empty';
+    // Prompt may sit in the incomplete tail (no trailing newline yet).
+    const tailPrompt = rawBuffer.match(PROMPT_RE);
+    if (tailPrompt) {
+      onPromptSeen(tailPrompt[1]);
+      rawBuffer = '';
+    }
+
+    if (displayLines.length > 0) {
+      appendOutput(displayLines.join('\n') + '\n');
+    }
   }
 
-  function jumpToCommand(direction) {
-    if (commandMarkers.length === 0) {
-      announce('No command markers yet - this requires the PowerShell shell-integration script.');
+  function resetCompletion() {
+    completion.baseLine = '';
+    completion.replacementIndex = 0;
+    completion.replacementLength = 0;
+    completion.matches = [];
+    completion.index = 0;
+  }
+
+  function applyCompletionMatch(index) {
+    if (!completion.matches.length) {
+      return;
+    }
+    const match = completion.matches[index];
+    const before = completion.baseLine.slice(0, completion.replacementIndex);
+    const after = completion.baseLine.slice(
+      completion.replacementIndex + completion.replacementLength
+    );
+    const newLine = before + match + after;
+    const caret = before.length + match.length;
+
+    applyingCompletion = true;
+    commandEl.value = newLine;
+    commandEl.setSelectionRange(caret, caret);
+    applyingCompletion = false;
+
+    completion.index = index;
+
+    if (completion.matches.length === 1) {
+      announce(match);
+    } else {
+      announce(
+        (index + 1) + ' of ' + completion.matches.length + ', ' + match
+      );
+    }
+  }
+
+  function cycleCompletion(direction) {
+    const n = completion.matches.length;
+    if (n === 0) {
+      return;
+    }
+    const next = (completion.index + direction + n) % n;
+    applyCompletionMatch(next);
+  }
+
+  function requestTabCompletion(direction) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    if (commandRunning) {
+      announce('Wait for the current command to finish.');
       return;
     }
 
-    const pos = accessibleViewContent.selectionStart;
-    const currentLine = accessibleViewContent.value.slice(0, pos).split('\n').length - 1;
-
-    let targetIndex;
-    if (direction === 'down') {
-      targetIndex = commandMarkers.findIndex(m => m.line > currentLine);
-      if (targetIndex === -1) targetIndex = commandMarkers.length - 1;
-    } else {
-      targetIndex = 0;
-      for (let i = 0; i < commandMarkers.length; i++) {
-        if (commandMarkers[i].line < currentLine) targetIndex = i;
-        else break;
-      }
+    // Already have matches for this token — cycle like PowerShell.
+    if (completion.matches.length > 0) {
+      cycleCompletion(direction);
+      return;
     }
 
-    const marker = commandMarkers[targetIndex];
-    const charOffset = currentLineOffsets[marker.line] ?? 0;
-    accessibleViewContent.setSelectionRange(charOffset, charOffset);
-    const lineHeight = parseInt(getComputedStyle(accessibleViewContent).lineHeight, 10) || 18;
-    accessibleViewContent.scrollTop = Math.max(0, (marker.line - 3) * lineHeight);
+    if (completionPending) {
+      return;
+    }
 
-    const commandText = getCommandTextForMarker(targetIndex);
-    announce(`Command ${targetIndex + 1} of ${commandMarkers.length}, ${marker.success ? 'succeeded' : 'failed'}: ${commandText}`);
+    const line = commandEl.value;
+    const cursor =
+      typeof commandEl.selectionStart === 'number'
+        ? commandEl.selectionStart
+        : line.length;
+
+    completionPending = true;
+    completionRequestId += 1;
+    const id = completionRequestId;
+
+    socket.send(
+      JSON.stringify({
+        type: 'complete',
+        id: id,
+        line: line,
+        cursor: cursor,
+        cwd: currentPath || undefined
+      })
+    );
   }
 
-  accessibleView.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      closeAccessibleView();
-    } else if (e.altKey && e.key === 'F2') {
-      e.preventDefault();
-      closeAccessibleView();
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      jumpToCommand('up');
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      jumpToCommand('down');
-    }
-  });
+  function handleCompleteResult(msg) {
+    completionPending = false;
 
-  closeButton.addEventListener('click', closeAccessibleView);
+    if (msg.id !== completionRequestId) {
+      return;
+    }
+
+    const matches = Array.isArray(msg.matches) ? msg.matches : [];
+    if (matches.length === 0) {
+      resetCompletion();
+      announce(msg.error ? 'No completions. ' + msg.error : 'No completions.');
+      return;
+    }
+
+    // Keep the line as it was when Tab was pressed so cycling replaces
+    // the same span each time (PowerShell ReplacementIndex/Length).
+    completion.baseLine = commandEl.value;
+    completion.replacementIndex =
+      typeof msg.replacementIndex === 'number' ? msg.replacementIndex : 0;
+    completion.replacementLength =
+      typeof msg.replacementLength === 'number' ? msg.replacementLength : 0;
+    completion.matches = matches;
+    applyCompletionMatch(0);
+  }
+
+  function runCommand(commandText) {
+    const text = commandText.trim();
+    if (!text || !socket || socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    if (commandRunning) {
+      announce('A command is still running.');
+      return;
+    }
+
+    resetCompletion();
+
+    const echo = (currentPath ? currentPath : 'PS') + '> ' + text + '\n';
+    appendOutput(echo);
+
+    pendingCommand = text;
+    commandRunning = true;
+    lastExitOk = true;
+    runBtn.disabled = true;
+
+    history.push(text);
+    historyIndex = history.length;
+    draftBeforeHistory = '';
+    commandEl.value = '';
+
+    announce('Running ' + text);
+    socket.send(text + '\r');
+  }
+
+  // --- WebSocket ---
 
   const protocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
   const socket = new WebSocket(protocol + location.host + '/ws');
 
-  socket.addEventListener('open', () => {
-    statusEl.textContent = 'Connected';
-    socket.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+  socket.addEventListener('open', function () {
+    setConnection('connecting', 'Connected. Waiting for PowerShell prompt…');
   });
 
-  socket.addEventListener('message', (event) => {
-    term.write(event.data);
-  });
+  socket.addEventListener('message', function (event) {
+    const data = typeof event.data === 'string' ? event.data : String(event.data);
 
-  socket.addEventListener('close', () => {
-    statusEl.textContent = 'Disconnected';
-    term.write('\r\n\x1b[31m[connection closed]\x1b[0m\r\n');
-  });
-
-  socket.addEventListener('error', () => {
-    statusEl.textContent = 'Connection error';
-  });
-
-  term.onData((data) => {
-    if (socket.readyState === WebSocket.OPEN) {
-      socket.send(data);
-    }
-  });
-
-  term.element.addEventListener('keydown', (e) => {
-    if (e.altKey && e.key === 'F2') {
-      e.preventDefault();
-      openAccessibleView();
-    } else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && commandMarkers.length > 0) {
-      e.preventDefault();
-
-      if (terminalHistoryIndex < 0) {
-        terminalHistoryIndex = commandMarkers.length - 1;
+    // Completion replies are JSON; shell output is raw text.
+    if (data.indexOf('{"type":"completeResult"') === 0) {
+      try {
+        handleCompleteResult(JSON.parse(data));
+        return;
+      } catch (e) {
+        // fall through to normal output handling
       }
+    }
 
-      if (e.key === 'ArrowUp') {
-        if (terminalHistoryIndex > 0) {
-          terminalHistoryIndex--;
-        }
+    handleIncoming(data);
+  });
+
+  socket.addEventListener('close', function () {
+    setControlsEnabled(false);
+    setConnection('disconnected', 'Connection closed.');
+    appendOutput('\n[connection closed]\n');
+    announce('Connection closed.');
+  });
+
+  socket.addEventListener('error', function () {
+    setConnection('error', 'Connection error.');
+    announce('Connection error.');
+  });
+
+  // --- Form / buttons ---
+
+  formEl.addEventListener('submit', function (event) {
+    event.preventDefault();
+    runCommand(commandEl.value);
+  });
+
+  clearBtn.addEventListener('click', function () {
+    outputEl.value = '';
+    announce('Output cleared.');
+    commandEl.focus();
+  });
+
+  focusOutputBtn.addEventListener('click', function () {
+    outputEl.focus();
+    // Place caret at end so JAWS/NVDA start near latest output.
+    const end = outputEl.value.length;
+    outputEl.setSelectionRange(end, end);
+    announce('Output focused.');
+  });
+
+  // Typing a new character starts a fresh completion query next Tab.
+  commandEl.addEventListener('input', function () {
+    if (applyingCompletion) {
+      return;
+    }
+    resetCompletion();
+  });
+
+  // Tab = complete (not move to Run). Up/Down = history. Escape = clear.
+  commandEl.addEventListener('keydown', function (event) {
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      requestTabCompletion(event.shiftKey ? -1 : 1);
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      resetCompletion();
+      if (history.length === 0) {
+        return;
+      }
+      if (historyIndex === history.length) {
+        draftBeforeHistory = commandEl.value;
+      }
+      historyIndex = Math.max(0, historyIndex - 1);
+      commandEl.value = history[historyIndex];
+      commandEl.setSelectionRange(commandEl.value.length, commandEl.value.length);
+    } else if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      resetCompletion();
+      if (history.length === 0) {
+        return;
+      }
+      if (historyIndex >= history.length - 1) {
+        historyIndex = history.length;
+        commandEl.value = draftBeforeHistory;
       } else {
-        if (terminalHistoryIndex < commandMarkers.length - 1) {
-          terminalHistoryIndex++;
-        }
+        historyIndex += 1;
+        commandEl.value = history[historyIndex];
       }
-
-      const marker = commandMarkers[terminalHistoryIndex];
-      const commandText = getCommandTextForMarker(terminalHistoryIndex);
-      announce(`Command ${terminalHistoryIndex + 1} of ${commandMarkers.length}, ${marker.success ? 'succeeded' : 'failed'}: ${commandText}`);
-
-      if (socket.readyState === WebSocket.OPEN) {
-        socket.send(e.key === 'ArrowUp' ? '\x1b[A' : '\x1b[B');
-      }
+      commandEl.setSelectionRange(commandEl.value.length, commandEl.value.length);
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      resetCompletion();
+      commandEl.value = '';
+      historyIndex = history.length;
+      draftBeforeHistory = '';
+      announce('Command cleared.');
     }
-  }, true);
+  });
+
+  // Global shortcuts that don't steal normal typing
+  document.addEventListener('keydown', function (event) {
+    if (event.altKey && !event.ctrlKey && !event.metaKey && event.key.toLowerCase() === 'o') {
+      event.preventDefault();
+      focusOutputBtn.click();
+    } else if (event.altKey && !event.ctrlKey && !event.metaKey && event.key.toLowerCase() === 'c') {
+      event.preventDefault();
+      commandEl.focus();
+      announce('Command field focused.');
+    }
+  });
+})();
 </script>
 </body>
 </html>
