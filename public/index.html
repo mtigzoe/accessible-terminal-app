@@ -684,7 +684,7 @@
 
   socket.addEventListener('open', function () {
     if (restoredPath) {
-      socket.send(JSON.stringify({ type: 'cwd', path: restoredPath }));
+      socket.send(JSON.stringify({ type: 'cwd', cwd: restoredPath }));
     }
     setConnection('connecting', 'Connected. Waiting for PowerShell prompt…');
   });
