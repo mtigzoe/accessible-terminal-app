@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Instructions — Accessible PowerShell</title>
+<title>Settings — Accessible PowerShell</title>
 <script>
 (function () {
   try {
@@ -40,19 +40,7 @@
   html[data-font-size="large"] { font-size: 18px; }
   html[data-font-size="x-large"] { font-size: 22px; }
 
-  html[data-high-contrast="true"] .menu-toggle {
-    background: #000;
-  }
-
-  html[data-high-contrast="true"] .menu-panel a:hover,
-  html[data-high-contrast="true"] .menu-panel a:focus {
-    background: #333;
-    color: #ffff00;
-  }
-
-  * {
-    box-sizing: border-box;
-  }
+  * { box-sizing: border-box; }
 
   body {
     margin: 0;
@@ -83,38 +71,33 @@
     font-family: inherit;
   }
 
-  .menu-toggle:hover {
-    border-color: var(--accent);
+  html[data-high-contrast="true"] .menu-toggle {
+    background: #000;
   }
 
+  .menu-toggle:hover { border-color: var(--accent); }
   .menu-toggle:focus {
     outline: 2px solid var(--focus);
     outline-offset: 2px;
   }
-
-  .menu-toggle[aria-expanded="true"] {
-    border-color: var(--accent);
-  }
+  .menu-toggle[aria-expanded="true"] { border-color: var(--accent); }
 
   .menu-panel {
     display: none;
     position: absolute;
     top: 100%;
     left: 0;
-    margin-top: 4px;
+    margin: 4px 0 0;
     min-width: 12rem;
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 6px 0;
     list-style: none;
-    margin: 4px 0 0;
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
   }
 
-  .menu-panel[data-open="true"] {
-    display: block;
-  }
+  .menu-panel[data-open="true"] { display: block; }
 
   .menu-panel a {
     display: block;
@@ -130,6 +113,12 @@
     outline: none;
   }
 
+  html[data-high-contrast="true"] .menu-panel a:hover,
+  html[data-high-contrast="true"] .menu-panel a:focus {
+    background: #333;
+    color: #ffff00;
+  }
+
   h1 {
     font-size: 1.35rem;
     font-weight: 600;
@@ -139,17 +128,11 @@
   h2 {
     font-size: 1.05rem;
     font-weight: 600;
-    margin: 1.5rem 0 0.5rem;
+    margin: 0 0 0.75rem;
     color: var(--accent);
   }
 
-  p, li {
-    color: var(--text);
-  }
-
-  .muted {
-    color: var(--muted);
-  }
+  .muted { color: var(--muted); }
 
   .panel {
     background: var(--bg);
@@ -159,28 +142,43 @@
     margin: 1rem 0;
   }
 
-  ul, ol {
-    margin: 0.4rem 0 0;
-    padding-left: 1.25rem;
+  fieldset {
+    border: none;
+    margin: 0;
+    padding: 0;
   }
 
-  li {
-    margin-bottom: 0.45rem;
+  legend {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    padding: 0;
   }
 
-  kbd {
-    background: #333;
-    border: 1px solid #555;
-    border-radius: 4px;
-    padding: 1px 6px;
-    font-family: Consolas, monospace;
-    font-size: 0.9em;
-    color: var(--text);
+  .setting-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.25rem;
+    margin-top: 0.5rem;
   }
 
-  code {
-    font-family: Consolas, "Courier New", monospace;
-    font-size: 0.95em;
+  label.option {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 1.1rem;
+    height: 1.1rem;
+    accent-color: var(--accent);
+  }
+
+  input:focus {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
   }
 
   a.back {
@@ -190,6 +188,18 @@
   a.back:focus {
     outline: 2px solid var(--focus);
     outline-offset: 2px;
+  }
+
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 </style>
 </head>
@@ -209,19 +219,17 @@
         <a role="menuitem" href="index.html" tabindex="-1">Terminal</a>
       </li>
       <li role="none">
-        <a role="menuitem" href="instructions.html" aria-current="page" tabindex="-1">Instructions</a>
+        <a role="menuitem" href="instructions.html" tabindex="-1">Instructions</a>
       </li>
       <li role="none">
-        <a role="menuitem" href="settings.html" tabindex="-1">Settings</a>
+        <a role="menuitem" href="settings.html" aria-current="page" tabindex="-1">Settings</a>
       </li>
     </ul>
   </nav>
 
   <header>
-    <h1>Accessible PowerShell</h1>
-    <p class="muted">
-      Simple screen-reader friendly shell: current path, output history, and a command box.
-    </p>
+    <h1>Settings</h1>
+    <p class="muted">Display preferences are saved in this browser and apply to all pages.</p>
   </header>
 
   <main>
@@ -229,93 +237,52 @@
       <a class="back" href="index.html">← Back to terminal</a>
     </p>
 
-    <section class="panel" aria-labelledby="overview-heading">
-      <h2 id="overview-heading">Overview</h2>
-      <p>
-        The terminal page has three regions:
-      </p>
-      <ul>
-        <li><strong>Current path</strong> — where you are in the filesystem</li>
-        <li><strong>Output</strong> — read-only history of commands and results</li>
-        <li><strong>Command</strong> — a text field to type PowerShell commands</li>
-      </ul>
-      <p>
-        There is no canvas terminal grid. Screen readers can move between path, output,
-        and the command box like any other form.
-      </p>
-    </section>
+    <form id="settings-form">
+      <section class="panel" aria-labelledby="contrast-heading">
+        <h2 id="contrast-heading">High contrast</h2>
+        <div class="setting-row">
+          <label class="option" for="high-contrast">
+            <input type="checkbox" id="high-contrast" name="high-contrast">
+            Use high contrast colours
+          </label>
+        </div>
+        <p class="muted" style="margin: 0.75rem 0 0; font-size: 0.95rem;">
+          Black background, white text, and yellow accents for stronger contrast.
+        </p>
+      </section>
 
-    <section class="panel" aria-labelledby="command-help-heading">
-      <h2 id="command-help-heading">Command field</h2>
-      <p>
-        Type a PowerShell command and press <kbd>Enter</kbd> to run it.
-        Press <kbd>Tab</kbd> to complete folder and command names.
-        Use <kbd>Up</kbd> and <kbd>Down</kbd> arrows for command history.
-      </p>
-    </section>
-
-    <section class="panel" aria-labelledby="output-help-heading">
-      <h2 id="output-help-heading">Output</h2>
-      <p>
-        The output box is a read-only history of commands and results.
-        Scroll or use your screen reader’s browse mode to read previous commands and their results.
-      </p>
-      <p>
-        Press <kbd>Alt</kbd>+<kbd>F2</kbd> or <kbd>Alt</kbd>+<kbd>O</kbd> to focus the output area.
-        Press <kbd>Alt</kbd>+<kbd>C</kbd> to return to the command field.
-      </p>
-    </section>
-
-    <section class="panel" aria-labelledby="howto-heading">
-      <h2 id="howto-heading">How to use (screen reader)</h2>
-      <ol>
-        <li>When the page loads, wait for the “Shell ready” announcement.</li>
-        <li>Focus lands on the <strong>Command</strong> field.</li>
-        <li>Type a command (for example <code>Get-Date</code> or <code>Get-ChildItem</code>) and press <kbd>Enter</kbd>.</li>
-        <li>A short status is announced when the command finishes (succeeded or failed).</li>
-        <li>Press <kbd>Alt</kbd>+<kbd>F2</kbd> or <kbd>Alt</kbd>+<kbd>O</kbd> to read results in the output box with browse mode / the virtual cursor.</li>
-        <li>Press <kbd>Alt</kbd>+<kbd>C</kbd> to return to the command field.</li>
-      </ol>
-    </section>
-
-    <section class="panel" aria-labelledby="hints-heading">
-      <h2 id="hints-heading">Keyboard tips</h2>
-      <ul>
-        <li><kbd>Enter</kbd> runs the command</li>
-        <li><kbd>Tab</kbd> completes paths and commands (like PowerShell); <kbd>Shift</kbd>+<kbd>Tab</kbd> cycles backward</li>
-        <li><kbd>Up</kbd> / <kbd>Down</kbd> recall previous commands</li>
-        <li><kbd>Alt</kbd>+<kbd>F2</kbd> or <kbd>Alt</kbd>+<kbd>O</kbd> moves focus to output</li>
-        <li><kbd>Alt</kbd>+<kbd>C</kbd> moves focus to the command field</li>
-        <li><kbd>Escape</kbd> clears the command field</li>
-      </ul>
-      <p class="muted">
-        Tab stays in the command field — it does not move focus to the Run button.
-        Completions use your current path so <code>cd per</code> + Tab can expand to a folder under that directory.
-      </p>
-    </section>
-
-    <section class="panel" aria-labelledby="menu-heading">
-      <h2 id="menu-heading">Menu</h2>
-      <ul>
-        <li>Focus the <strong>Menu</strong> button in the top-left corner.</li>
-        <li>Press <kbd>Enter</kbd>, <kbd>Space</kbd>, or <kbd>Down</kbd> to open the menu and move to the first option.</li>
-        <li>Use <kbd>Up</kbd> / <kbd>Down</kbd> to move between options; <kbd>Home</kbd> / <kbd>End</kbd> jump to first or last.</li>
-        <li>Press <kbd>Enter</kbd> to choose an option.</li>
-        <li>Press <kbd>Escape</kbd> to close the menu and return focus to the Menu button.</li>
-      </ul>
-    </section>
-
-    <section class="panel" aria-labelledby="path-heading">
-      <h2 id="path-heading">Current path across refreshes</h2>
-      <p>
-        The last working directory is saved in the browser. After you refresh the page,
-        the shell restores that path automatically when possible.
-      </p>
-    </section>
+      <section class="panel" aria-labelledby="font-heading">
+        <h2 id="font-heading">Font size</h2>
+        <fieldset>
+          <legend class="visually-hidden">Font size</legend>
+          <div class="setting-row" role="radiogroup" aria-labelledby="font-heading">
+            <label class="option">
+              <input type="radio" name="font-size" value="small">
+              Small
+            </label>
+            <label class="option">
+              <input type="radio" name="font-size" value="medium" checked>
+              Medium
+            </label>
+            <label class="option">
+              <input type="radio" name="font-size" value="large">
+              Large
+            </label>
+            <label class="option">
+              <input type="radio" name="font-size" value="x-large">
+              Extra large
+            </label>
+          </div>
+        </fieldset>
+      </section>
+    </form>
   </main>
+
+  <div id="sr-status" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <script>
 (function () {
+  // --- Menu ---
   const menuToggle = document.getElementById('menu-toggle');
   const menuPanel = document.getElementById('menu-panel');
   const menuItems = Array.prototype.slice.call(
@@ -343,9 +310,7 @@
   }
 
   function focusMenuItem(index) {
-    if (!menuItems.length) {
-      return;
-    }
+    if (!menuItems.length) return;
     const n = menuItems.length;
     const i = ((index % n) + n) % n;
     menuItems[i].focus();
@@ -356,11 +321,8 @@
   }
 
   menuToggle.addEventListener('click', function () {
-    if (isMenuOpen()) {
-      setMenuOpen(false);
-    } else {
-      setMenuOpen(true, 0);
-    }
+    if (isMenuOpen()) setMenuOpen(false);
+    else setMenuOpen(true, 0);
   });
 
   menuToggle.addEventListener('keydown', function (event) {
@@ -374,11 +336,8 @@
   });
 
   menuPanel.addEventListener('keydown', function (event) {
-    if (!isMenuOpen()) {
-      return;
-    }
+    if (!isMenuOpen()) return;
     const idx = currentMenuIndex();
-
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       focusMenuItem(idx < 0 ? 0 : idx + 1);
@@ -414,6 +373,82 @@
       setMenuOpen(false);
     }
   });
+
+  // --- Settings ---
+  const highContrastEl = document.getElementById('high-contrast');
+  const fontRadios = document.querySelectorAll('input[name="font-size"]');
+  const srStatus = document.getElementById('sr-status');
+
+  function announce(text) {
+    srStatus.textContent = '';
+    window.setTimeout(function () {
+      srStatus.textContent = text;
+    }, 80);
+  }
+
+  function applyToDocument(highContrast, fontSize) {
+    document.documentElement.setAttribute(
+      'data-high-contrast',
+      highContrast ? 'true' : 'false'
+    );
+    document.documentElement.setAttribute('data-font-size', fontSize);
+  }
+
+  function saveSettings(highContrast, fontSize) {
+    try {
+      localStorage.setItem('terminal-high-contrast', highContrast ? 'true' : 'false');
+      localStorage.setItem('terminal-font-size', fontSize);
+    } catch (e) {}
+    applyToDocument(highContrast, fontSize);
+  }
+
+  function loadSettings() {
+    var hc = false;
+    var fs = 'medium';
+    try {
+      hc = localStorage.getItem('terminal-high-contrast') === 'true';
+      var saved = localStorage.getItem('terminal-font-size');
+      if (saved === 'small' || saved === 'medium' || saved === 'large' || saved === 'x-large') {
+        fs = saved;
+      }
+    } catch (e) {}
+
+    highContrastEl.checked = hc;
+    fontRadios.forEach(function (radio) {
+      radio.checked = radio.value === fs;
+    });
+    applyToDocument(hc, fs);
+  }
+
+  function currentFontSize() {
+    var selected = document.querySelector('input[name="font-size"]:checked');
+    return selected ? selected.value : 'medium';
+  }
+
+  highContrastEl.addEventListener('change', function () {
+    saveSettings(highContrastEl.checked, currentFontSize());
+    announce(
+      highContrastEl.checked
+        ? 'High contrast mode on.'
+        : 'High contrast mode off.'
+    );
+  });
+
+  fontRadios.forEach(function (radio) {
+    radio.addEventListener('change', function () {
+      if (!radio.checked) return;
+      saveSettings(highContrastEl.checked, radio.value);
+      var labels = {
+        small: 'Small',
+        medium: 'Medium',
+        large: 'Large',
+        'x-large': 'Extra large'
+      };
+      announce('Font size set to ' + (labels[radio.value] || radio.value) + '.');
+    });
+  });
+
+  loadSettings();
 })();
 </script>
 </body>
