@@ -293,6 +293,7 @@
 
   <!-- Short status only — not the full command output (that lives in #output). -->
   <div id="sr-status" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
+  <div id="sr-alert" class="visually-hidden" role="alert" aria-live="assertive" aria-atomic="true"></div>
 
 <script>
 (function () {
@@ -305,6 +306,7 @@
   const focusOutputBtn = document.getElementById('focus-output-btn');
   const connectionEl = document.getElementById('connection-status');
   const srStatus = document.getElementById('sr-status');
+  const srAlert = document.getElementById('sr-alert');
 
   const history = [];
   let historyIndex = -1;
@@ -316,6 +318,7 @@
   let commandRunning = false;
   let ready = false;
   let pendingCommand = null;
+  let restoredPath = null;
 
   // Tab completion state (PowerShell TabExpansion2 via the server)
   let completionRequestId = 0;
@@ -337,7 +340,14 @@
     // Brief clear so the same message can be re-announced.
     window.setTimeout(function () {
       srStatus.textContent = text;
-    }, 40);
+    }, 100);
+  }
+
+  function announceAlert(text) {
+    srAlert.textContent = '';
+    window.setTimeout(function () {
+      srAlert.textContent = text;
+    }, 60);
   }
 
   function setConnection(state, message) {
@@ -358,6 +368,24 @@
     }
     currentPath = path;
     pathEl.textContent = path;
+    try {
+      localStorage.setItem('terminal-last-path', path);
+    } catch {
+      // storage may be unavailable
+    }
+  }
+
+  function restorePath() {
+    try {
+      const saved = localStorage.getItem('terminal-last-path');
+      if (saved) {
+        restoredPath = saved;
+        currentPath = saved;
+        pathEl.textContent = saved;
+      }
+    } catch {
+      // storage may be unavailable
+    }
   }
 
   function appendOutput(text) {
@@ -423,6 +451,9 @@
   }
 
   function onPromptSeen(path) {
+    if (restoredPath && path === restoredPath) {
+      restoredPath = null;
+    }
     setPath(path);
     // Fallback when shell-integration markers are missing: prompt means idle.
     finishCommand();
@@ -492,6 +523,17 @@
       return;
     }
     const match = completion.matches[index];
+
+    completion.index = index;
+
+    if (completion.matches.length === 1) {
+      announceAlert(match);
+    } else {
+      announceAlert(
+        (index + 1) + ' of ' + completion.matches.length + ', ' + match
+      );
+    }
+
     const before = completion.baseLine.slice(0, completion.replacementIndex);
     const after = completion.baseLine.slice(
       completion.replacementIndex + completion.replacementLength
@@ -503,16 +545,6 @@
     commandEl.value = newLine;
     commandEl.setSelectionRange(caret, caret);
     applyingCompletion = false;
-
-    completion.index = index;
-
-    if (completion.matches.length === 1) {
-      announce(match);
-    } else {
-      announce(
-        (index + 1) + ' of ' + completion.matches.length + ', ' + match
-      );
-    }
   }
 
   function cycleCompletion(direction) {
@@ -645,10 +677,15 @@
 
   // --- WebSocket ---
 
+  restorePath();
+
   const protocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
   const socket = new WebSocket(protocol + location.host + '/ws');
 
   socket.addEventListener('open', function () {
+    if (restoredPath) {
+      socket.send(JSON.stringify({ type: 'cwd', path: restoredPath }));
+    }
     setConnection('connecting', 'Connected. Waiting for PowerShell prompt…');
   });
 

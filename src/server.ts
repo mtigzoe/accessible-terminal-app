@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as http from 'http';
 import * as os from 'os';
 import * as path from 'path';
-import { WebSocket, WebSocketServer } from 'ws';
+import { WebSocket, WebSocketServer, RawData } from 'ws';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pty = require('node-pty');
 
@@ -269,7 +269,7 @@ app.post('/api/complete', async (req, res) => {
   res.json(payload);
 });
 
-function rawDataToString(raw: WebSocket.RawData): string {
+function rawDataToString(raw: RawData): string {
   if (typeof raw === 'string') {
     return raw;
   }
@@ -283,34 +283,36 @@ function rawDataToString(raw: WebSocket.RawData): string {
 }
 
 wss.on('connection', (ws: WebSocket) => {
-  const ptyProcess = pty.spawn(shell, shellArgs, {
-    name: 'xterm-color',
-    cols: 90,
-    rows: 24,
-    cwd: defaultCwd,
-    env: process.env
-  });
+  let ptyProcess: any = null;
 
-  ptyProcess.onData((data: string) => {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.send(data);
-    }
-  });
+  function spawnPty(cwd: string) {
+    ptyProcess = pty.spawn(shell, shellArgs, {
+      name: 'xterm-color',
+      cols: 90,
+      rows: 24,
+      cwd: resolveCwd(cwd),
+      env: process.env
+    });
 
-  ptyProcess.onExit(() => {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.close();
-    }
-  });
+    ptyProcess.onData((data: string) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(data);
+      }
+    });
 
-  ws.on('message', (raw: WebSocket.RawData) => {
+    ptyProcess.onExit(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
+    });
+  }
+
+  ws.on('message', (raw: RawData) => {
     const text = rawDataToString(raw);
 
-    // Any JSON object with a "type" field is a control message — never shell input.
-    // (Prevents accidents like tab-complete payloads being typed into PowerShell.)
     if (text.length > 0 && text.charAt(0) === '{') {
       try {
-        const parsed = JSON.parse(text) as { type?: string; cols?: number; rows?: number };
+        const parsed = JSON.parse(text) as { type?: string; cols?: number; rows?: number; cwd?: string };
 
         if (parsed && typeof parsed === 'object' && typeof parsed.type === 'string') {
           if (
@@ -318,8 +320,19 @@ wss.on('connection', (ws: WebSocket) => {
             typeof parsed.cols === 'number' &&
             typeof parsed.rows === 'number'
           ) {
-            ptyProcess.resize(parsed.cols, parsed.rows);
+            if (ptyProcess) {
+              ptyProcess.resize(parsed.cols, parsed.rows);
+            }
+            return;
           }
+
+          if (parsed.type === 'cwd' && typeof parsed.cwd === 'string') {
+            if (!ptyProcess) {
+              spawnPty(parsed.cwd);
+            }
+            return;
+          }
+
           // Ignore unknown control types (including legacy "complete" over WS).
           return;
         }
@@ -328,11 +341,17 @@ wss.on('connection', (ws: WebSocket) => {
       }
     }
 
-    ptyProcess.write(text);
+    if (!ptyProcess) {
+      spawnPty(defaultCwd);
+    }
+
+    ptyProcess!.write(text);
   });
 
   ws.on('close', () => {
-    ptyProcess.kill();
+    if (ptyProcess) {
+      ptyProcess.kill();
+    }
   });
 });
 
