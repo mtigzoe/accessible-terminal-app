@@ -1,10 +1,9 @@
 # Minimal PowerShell "shell integration" for the accessible terminal app.
 #
 # Overrides the prompt function to emit invisible OSC 633 marker sequences
-# around each prompt. These are never displayed - xterm.js's parser consumes
-# them silently - but the browser-side code listens for them to find command
-# boundaries and know whether the previous command succeeded, powering the
-# "jump to previous/next command" navigation in the accessible view.
+# around each prompt. These are never displayed - the browser-side code
+# listens for them to find command boundaries and know whether the previous
+# command succeeded.
 #
 # Loosely follows the OSC 633 convention used by VS Code's own shell
 # integration scripts. [char]27/[char]7 are used instead of the `e/`a
@@ -27,5 +26,3 @@ function prompt {
 
     "PS $($executionContext.SessionState.Path.CurrentLocation)$('>' * ($nestedPromptLevel + 1)) "
 }
-
-Write-Host "Shell integration active - command navigation available in the browser's accessible view (Alt+F2)."
