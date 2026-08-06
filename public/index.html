@@ -4,6 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Accessible PowerShell</title>
+<script>
+(function () {
+  try {
+    var hc = localStorage.getItem('terminal-high-contrast') === 'true';
+    var fs = localStorage.getItem('terminal-font-size') || 'medium';
+    document.documentElement.setAttribute('data-high-contrast', hc ? 'true' : 'false');
+    document.documentElement.setAttribute('data-font-size', fs);
+  } catch (e) {}
+})();
+</script>
 <style>
   :root {
     --bg: #0c0c0c;
@@ -15,6 +25,44 @@
     --focus: #4fc1e9;
     --error: #f48771;
     --ok: #89d185;
+  }
+
+  html[data-high-contrast="true"] {
+    --bg: #000000;
+    --panel: #000000;
+    --text: #ffffff;
+    --muted: #ffffff;
+    --accent: #ffff00;
+    --border: #ffffff;
+    --focus: #ffff00;
+    --error: #ff6b6b;
+    --ok: #00ff00;
+  }
+
+  html[data-font-size="small"] { font-size: 14px; }
+  html[data-font-size="medium"] { font-size: 16px; }
+  html[data-font-size="large"] { font-size: 18px; }
+  html[data-font-size="x-large"] { font-size: 22px; }
+
+  html[data-high-contrast="true"] .menu-toggle,
+  html[data-high-contrast="true"] button {
+    background: #000;
+  }
+
+  html[data-high-contrast="true"] button.primary {
+    background: #000;
+    border-color: #ffff00;
+    color: #ffff00;
+  }
+
+  html[data-high-contrast="true"] .menu-panel a:hover,
+  html[data-high-contrast="true"] .menu-panel a:focus {
+    background: #333;
+    color: #ffff00;
+  }
+
+  #output, #command {
+    font-size: 1rem;
   }
 
   * {
@@ -32,7 +80,6 @@
     max-width: 56rem;
   }
 
-  /* Top-left menu */
   .app-menu {
     position: fixed;
     top: 12px;
@@ -132,7 +179,6 @@
     border: 1px solid var(--border);
     border-radius: 4px;
     font-family: Consolas, "Courier New", monospace;
-    font-size: 14px;
     line-height: 1.35;
     padding: 10px;
     resize: vertical;
@@ -165,7 +211,6 @@
     border: 1px solid var(--border);
     border-radius: 4px;
     font-family: Consolas, "Courier New", monospace;
-    font-size: 15px;
     padding: 10px 12px;
   }
 
@@ -239,17 +284,18 @@
       <li role="none">
         <a role="menuitem" href="instructions.html" tabindex="-1">Instructions</a>
       </li>
+      <li role="none">
+        <a role="menuitem" href="settings.html" tabindex="-1">Settings</a>
+      </li>
     </ul>
   </nav>
 
   <main>
-    <!-- Current path -->
     <section class="panel" aria-labelledby="path-heading">
       <h2 id="path-heading">Current path</h2>
       <p id="path-value" aria-live="polite">Waiting for shell…</p>
     </section>
 
-    <!-- Output -->
     <section class="panel" aria-labelledby="output-heading">
       <h2 id="output-heading">Output</h2>
       <textarea
@@ -264,7 +310,6 @@
       </p>
     </section>
 
-    <!-- Command field -->
     <section class="panel">
       <form id="command-form" class="command-row">
         <div class="command-field">
@@ -285,13 +330,11 @@
     </section>
   </main>
 
-  <!-- Live regions for screen reader status only (not shown on screen). -->
   <div id="sr-status" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
   <div id="sr-alert" class="visually-hidden" role="alert" aria-live="assertive" aria-atomic="true"></div>
 
 <script>
 (function () {
-  // --- Accessible menu (keyboard navigation) ---
   const menuToggle = document.getElementById('menu-toggle');
   const menuPanel = document.getElementById('menu-panel');
   const menuItems = Array.prototype.slice.call(
@@ -392,7 +435,6 @@
     }
   });
 
-  // --- Shell UI ---
   const pathEl = document.getElementById('path-value');
   const outputEl = document.getElementById('output');
   const commandEl = document.getElementById('command');
@@ -780,8 +822,6 @@
     socket.send(text + '\r');
   }
 
-  // --- WebSocket ---
-
   restorePath();
 
   const protocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
@@ -808,8 +848,6 @@
   socket.addEventListener('error', function () {
     announce('Connection error.');
   });
-
-  // --- Form / buttons ---
 
   formEl.addEventListener('submit', function (event) {
     event.preventDefault();
@@ -872,7 +910,6 @@
     }
   });
 
-  // Global shortcuts: Alt+F2 / Alt+O → output; Alt+C → command
   document.addEventListener('keydown', function (event) {
     if (event.altKey && !event.ctrlKey && !event.metaKey) {
       const key = event.key.toLowerCase();

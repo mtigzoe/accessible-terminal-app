@@ -4,6 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Instructions — Accessible PowerShell</title>
+<script>
+(function () {
+  try {
+    var hc = localStorage.getItem('terminal-high-contrast') === 'true';
+    var fs = localStorage.getItem('terminal-font-size') || 'medium';
+    document.documentElement.setAttribute('data-high-contrast', hc ? 'true' : 'false');
+    document.documentElement.setAttribute('data-font-size', fs);
+  } catch (e) {}
+})();
+</script>
 <style>
   :root {
     --bg: #0c0c0c;
@@ -13,6 +23,31 @@
     --accent: #4fc1e9;
     --border: #333;
     --focus: #4fc1e9;
+  }
+
+  html[data-high-contrast="true"] {
+    --bg: #000000;
+    --panel: #000000;
+    --text: #ffffff;
+    --muted: #ffffff;
+    --accent: #ffff00;
+    --border: #ffffff;
+    --focus: #ffff00;
+  }
+
+  html[data-font-size="small"] { font-size: 14px; }
+  html[data-font-size="medium"] { font-size: 16px; }
+  html[data-font-size="large"] { font-size: 18px; }
+  html[data-font-size="x-large"] { font-size: 22px; }
+
+  html[data-high-contrast="true"] .menu-toggle {
+    background: #000;
+  }
+
+  html[data-high-contrast="true"] .menu-panel a:hover,
+  html[data-high-contrast="true"] .menu-panel a:focus {
+    background: #333;
+    color: #ffff00;
   }
 
   * {
@@ -175,6 +210,9 @@
       </li>
       <li role="none">
         <a role="menuitem" href="instructions.html" aria-current="page" tabindex="-1">Instructions</a>
+      </li>
+      <li role="none">
+        <a role="menuitem" href="settings.html" tabindex="-1">Settings</a>
       </li>
     </ul>
   </nav>
