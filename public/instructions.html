@@ -180,8 +180,10 @@
   </nav>
 
   <header>
-    <h1>Instructions</h1>
-    <p class="muted">How to use Accessible PowerShell with a screen reader or keyboard.</p>
+    <h1>Accessible PowerShell</h1>
+    <p class="muted">
+      Simple screen-reader friendly shell: current path, output history, and a command box.
+    </p>
   </header>
 
   <main>
@@ -192,7 +194,7 @@
     <section class="panel" aria-labelledby="overview-heading">
       <h2 id="overview-heading">Overview</h2>
       <p>
-        The interface has three clear regions:
+        The terminal page has three regions:
       </p>
       <ul>
         <li><strong>Current path</strong> — where you are in the filesystem</li>
@@ -200,7 +202,7 @@
         <li><strong>Command</strong> — a text field to type PowerShell commands</li>
       </ul>
       <p>
-        There is no canvas terminal grid. Screen readers can tab between path, output,
+        There is no canvas terminal grid. Screen readers can move between path, output,
         and the command box like any other form.
       </p>
     </section>
@@ -217,11 +219,11 @@
     <section class="panel" aria-labelledby="howto-heading">
       <h2 id="howto-heading">How to use (screen reader)</h2>
       <ol>
-        <li>When the page loads, wait for “Shell ready” / “Connected to PowerShell.”</li>
+        <li>When the page loads, wait for the “Shell ready” announcement.</li>
         <li>Focus lands on the <strong>Command</strong> field.</li>
         <li>Type a command (for example <code>Get-Date</code> or <code>Get-ChildItem</code>) and press <kbd>Enter</kbd>.</li>
         <li>A short status is announced when the command finishes (succeeded or failed).</li>
-        <li>Press <kbd>Alt</kbd>+<kbd>F2</kbd> or <kbd>Alt</kbd>+<kbd>O</kbd> (or “Go to output”) to read results in the output box with browse mode / the virtual cursor.</li>
+        <li>Press <kbd>Alt</kbd>+<kbd>F2</kbd> or <kbd>Alt</kbd>+<kbd>O</kbd> to read results in the output box with browse mode / the virtual cursor.</li>
         <li>Press <kbd>Alt</kbd>+<kbd>C</kbd> to return to the command field.</li>
       </ol>
     </section>

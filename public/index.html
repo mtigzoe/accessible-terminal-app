@@ -98,18 +98,6 @@
     outline: none;
   }
 
-  h1 {
-    font-size: 1.35rem;
-    font-weight: 600;
-    margin: 0 0 4px;
-  }
-
-  .subtitle {
-    color: var(--muted);
-    margin: 0 0 20px;
-    font-size: 0.95rem;
-  }
-
   .panel {
     background: var(--bg);
     border: 1px solid var(--border);
@@ -131,6 +119,7 @@
     font-family: Consolas, "Courier New", monospace;
     font-size: 1.05rem;
     word-break: break-all;
+    margin: 0;
   }
 
   #output {
@@ -167,16 +156,6 @@
   .command-field {
     flex: 1 1 16rem;
     min-width: 0;
-  }
-
-  label {
-    display: block;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    margin-bottom: 6px;
   }
 
   #command {
@@ -232,20 +211,6 @@
     cursor: not-allowed;
   }
 
-  .connection {
-    font-size: 0.9rem;
-    margin-bottom: 12px;
-  }
-
-  .connection[data-state="connected"] {
-    color: var(--ok);
-  }
-
-  .connection[data-state="disconnected"],
-  .connection[data-state="error"] {
-    color: var(--error);
-  }
-
   .visually-hidden {
     position: absolute;
     width: 1px;
@@ -277,29 +242,14 @@
     </ul>
   </nav>
 
-  <header>
-    <h1>Accessible PowerShell</h1>
-    <p class="subtitle">
-      Simple screen-reader friendly shell: current path, output history, and a command box.
-    </p>
-    <p
-      id="connection-status"
-      class="connection"
-      data-state="connecting"
-      role="status"
-      aria-live="polite">
-      Connecting…
-    </p>
-  </header>
-
   <main>
-    <!-- 1. Current path -->
+    <!-- Current path -->
     <section class="panel" aria-labelledby="path-heading">
       <h2 id="path-heading">Current path</h2>
       <p id="path-value" aria-live="polite">Waiting for shell…</p>
     </section>
 
-    <!-- 2. Output -->
+    <!-- Output -->
     <section class="panel" aria-labelledby="output-heading">
       <h2 id="output-heading">Output</h2>
       <textarea
@@ -314,30 +264,28 @@
       </p>
     </section>
 
-    <!-- 3. Command field -->
-    <section class="panel" aria-labelledby="command-heading">
-      <h2 id="command-heading" class="visually-hidden">Command</h2>
+    <!-- Command field -->
+    <section class="panel">
       <form id="command-form" class="command-row">
         <div class="command-field">
-          <label for="command">Command</label>
           <input
             type="text"
             id="command"
             name="command"
             autocomplete="off"
             spellcheck="false"
+            aria-label="Command"
             disabled>
         </div>
         <div class="actions">
           <button type="submit" id="run-btn" class="primary" disabled>Run</button>
           <button type="button" id="clear-btn" disabled>Clear output</button>
-          <button type="button" id="focus-output-btn" disabled>Go to output</button>
         </div>
       </form>
     </section>
   </main>
 
-  <!-- Short status only — not the full command output (that lives in #output). -->
+  <!-- Live regions for screen reader status only (not shown on screen). -->
   <div id="sr-status" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
   <div id="sr-alert" class="visually-hidden" role="alert" aria-live="assertive" aria-atomic="true"></div>
 
@@ -451,8 +399,6 @@
   const formEl = document.getElementById('command-form');
   const runBtn = document.getElementById('run-btn');
   const clearBtn = document.getElementById('clear-btn');
-  const focusOutputBtn = document.getElementById('focus-output-btn');
-  const connectionEl = document.getElementById('connection-status');
   const srStatus = document.getElementById('sr-status');
   const srAlert = document.getElementById('sr-alert');
 
@@ -469,7 +415,6 @@
   let restoredPath = null;
   let pathRestoreAttempted = false;
 
-  // Tab completion state (PowerShell TabExpansion2 via the server)
   let completionRequestId = 0;
   let completionPending = false;
   let applyingCompletion = false;
@@ -481,7 +426,6 @@
     index: 0
   };
 
-  // Matches PowerShell prompts like: PS C:\Users\You>  or  PS C:\Users\You>>
   const PROMPT_RE = /^PS\s+(.+?)(>+)\s*$/;
 
   function announce(text) {
@@ -498,16 +442,10 @@
     }, 60);
   }
 
-  function setConnection(state, message) {
-    connectionEl.dataset.state = state;
-    connectionEl.textContent = message;
-  }
-
   function setControlsEnabled(enabled) {
     commandEl.disabled = !enabled;
     runBtn.disabled = !enabled;
     clearBtn.disabled = !enabled;
-    focusOutputBtn.disabled = !enabled;
   }
 
   function pathsEqual(a, b) {
@@ -607,6 +545,9 @@
   }
 
   function focusOutput() {
+    if (commandEl.disabled) {
+      return;
+    }
     outputEl.focus();
     const end = outputEl.value.length;
     try {
@@ -627,7 +568,6 @@
     if (!ready) {
       ready = true;
       setControlsEnabled(true);
-      setConnection('connected', 'Connected to PowerShell.');
 
       if (restoredPath && !pathsEqual(path, restoredPath) && !pathRestoreAttempted) {
         pathRestoreAttempted = true;
@@ -851,7 +791,7 @@
     if (restoredPath) {
       requestPathRestore(restoredPath);
     }
-    setConnection('connecting', 'Connected. Waiting for PowerShell prompt…');
+    announce('Connecting. Waiting for PowerShell prompt.');
   });
 
   socket.addEventListener('message', function (event) {
@@ -861,13 +801,11 @@
 
   socket.addEventListener('close', function () {
     setControlsEnabled(false);
-    setConnection('disconnected', 'Connection closed.');
     appendOutput('\n[connection closed]\n');
     announce('Connection closed.');
   });
 
   socket.addEventListener('error', function () {
-    setConnection('error', 'Connection error.');
     announce('Connection error.');
   });
 
@@ -882,10 +820,6 @@
     outputEl.value = '';
     announce('Output cleared.');
     commandEl.focus();
-  });
-
-  focusOutputBtn.addEventListener('click', function () {
-    focusOutput();
   });
 
   commandEl.addEventListener('input', function () {
@@ -942,12 +876,9 @@
   document.addEventListener('keydown', function (event) {
     if (event.altKey && !event.ctrlKey && !event.metaKey) {
       const key = event.key.toLowerCase();
-      // F2 may be reported as 'F2' or 'f2' depending on browser
       if (key === 'f2' || event.key === 'F2' || key === 'o') {
         event.preventDefault();
-        if (!focusOutputBtn.disabled) {
-          focusOutput();
-        }
+        focusOutput();
       } else if (key === 'c') {
         event.preventDefault();
         commandEl.focus();
