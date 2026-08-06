@@ -108,6 +108,8 @@
   const clearBtn = document.getElementById('clear-btn');
   const srStatus = document.getElementById('sr-status');
   const srAlert = document.getElementById('sr-alert');
+  const structuredPanel = document.getElementById('structured-panel');
+  const structuredContent = document.getElementById('structured-content');
 
   const history = [];
   let historyIndex = -1;
@@ -121,6 +123,9 @@
   let pendingCommand = null;
   let restoredPath = null;
   let pathRestoreAttempted = false;
+
+  // Captures output of the current command for structured interpretation.
+  let commandOutputChunks = [];
 
   let completionRequestId = 0;
   let completionPending = false;
@@ -246,6 +251,385 @@
     return chunk.replace(/\u001b\]633;[^\u0007]*\u0007/g, '');
   }
 
+  // --- Structured view -----------------------------------------------------
+
+  function clearStructuredView() {
+    if (!structuredPanel || !structuredContent) {
+      return;
+    }
+    structuredContent.innerHTML = '';
+    structuredPanel.hidden = true;
+  }
+
+  function normalizeGitCommand(cmd) {
+    if (!cmd) {
+      return '';
+    }
+    return String(cmd).trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  function isGitStatusCommand(cmd) {
+    const n = normalizeGitCommand(cmd);
+    return n === 'git status' || n === 'git status -sb' || n === 'git status --short';
+  }
+
+  function isGitBranchCommand(cmd) {
+    const n = normalizeGitCommand(cmd);
+    return (
+      n === 'git branch' ||
+      n === 'git branch -v' ||
+      n === 'git branch -vv' ||
+      n === 'git branch --list'
+    );
+  }
+
+  /**
+   * Rule-based interpreters for a few high-value commands.
+   * Returns a structured view object or null if the output is not recognized.
+   * Shape:
+   * {
+   *   title, summary,
+   *   items: [{ title, meta, current?, actions: [{ id, label, command, confirm? }] }],
+   *   globalActions: [{ id, label, command, confirm? }]
+   * }
+   */
+  function interpretOutput(command, outputText) {
+    if (isGitStatusCommand(command)) {
+      return interpretGitStatus(outputText);
+    }
+    if (isGitBranchCommand(command)) {
+      return interpretGitBranch(outputText);
+    }
+    return null;
+  }
+
+  function interpretGitStatus(text) {
+    const lines = String(text || '').split('\n').map(function (l) {
+      return l.replace(/\r$/, '');
+    });
+
+    let branch = null;
+    let ahead = null;
+    let behind = null;
+    const staged = [];
+    const unstaged = [];
+    const untracked = [];
+    let section = null;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const branchMatch = line.match(/^On branch\s+(.+)\s*$/i);
+      if (branchMatch) {
+        branch = branchMatch[1].trim();
+        continue;
+      }
+      const aheadBehind = line.match(
+        /Your branch is (ahead of|behind) '([^']+)' by (\d+) commit/i
+      );
+      if (aheadBehind) {
+        if (/ahead/i.test(aheadBehind[1])) {
+          ahead = parseInt(aheadBehind[3], 10);
+        } else {
+          behind = parseInt(aheadBehind[3], 10);
+        }
+        continue;
+      }
+      if (/Changes to be committed/i.test(line)) {
+        section = 'staged';
+        continue;
+      }
+      if (/Changes not staged for commit/i.test(line)) {
+        section = 'unstaged';
+        continue;
+      }
+      if (/Untracked files/i.test(line)) {
+        section = 'untracked';
+        continue;
+      }
+      if (/^\s*$/.test(line) || /^\s*\(use "/i.test(line) || /^no changes added/i.test(line)) {
+        continue;
+      }
+      const fileMatch = line.match(/^\s*(modified|new file|deleted|renamed):\s+(.+)$/i);
+      if (fileMatch) {
+        const entry = fileMatch[1].toLowerCase() + ': ' + fileMatch[2].trim();
+        if (section === 'staged') staged.push(entry);
+        else if (section === 'unstaged') unstaged.push(entry);
+        continue;
+      }
+      if (section === 'untracked' && /^\s+\S/.test(line)) {
+        untracked.push(line.trim());
+      }
+    }
+
+    if (!branch && staged.length === 0 && unstaged.length === 0 && untracked.length === 0) {
+      // Not recognizable as git status output.
+      return null;
+    }
+
+    const summaryParts = [];
+    if (branch) summaryParts.push('Branch ' + branch);
+    if (ahead) summaryParts.push(ahead + ' commit' + (ahead === 1 ? '' : 's') + ' ahead');
+    if (behind) summaryParts.push(behind + ' commit' + (behind === 1 ? '' : 's') + ' behind');
+    if (staged.length === 0 && unstaged.length === 0 && untracked.length === 0) {
+      summaryParts.push('working tree clean');
+    } else {
+      if (staged.length) summaryParts.push(staged.length + ' staged');
+      if (unstaged.length) summaryParts.push(unstaged.length + ' unstaged');
+      if (untracked.length) summaryParts.push(untracked.length + ' untracked');
+    }
+
+    const items = [];
+    function addFileGroup(label, files) {
+      if (!files.length) return;
+      items.push({
+        title: label,
+        meta: files.join(', '),
+        actions: []
+      });
+    }
+    addFileGroup('Staged changes', staged);
+    addFileGroup('Unstaged changes', unstaged);
+    addFileGroup('Untracked files', untracked);
+
+    const globalActions = [
+      { id: 'diff', label: 'View diff', command: 'git diff' },
+      { id: 'log', label: 'Recent commits', command: 'git log --oneline -n 10' }
+    ];
+    if (staged.length > 0) {
+      globalActions.unshift({
+        id: 'commit',
+        label: 'Commit staged changes',
+        command: 'git commit'
+      });
+    }
+    if (ahead && ahead > 0) {
+      globalActions.unshift({ id: 'push', label: 'Push', command: 'git push' });
+    }
+    if (unstaged.length > 0 || untracked.length > 0) {
+      globalActions.push({
+        id: 'add-all',
+        label: 'Stage all changes',
+        command: 'git add -A'
+      });
+    }
+
+    return {
+      title: 'Git status',
+      summary: summaryParts.join('. ') + '.',
+      items: items,
+      globalActions: globalActions
+    };
+  }
+
+  function interpretGitBranch(text) {
+    const lines = String(text || '')
+      .split('\n')
+      .map(function (l) {
+        return l.replace(/\r$/, '');
+      })
+      .filter(function (l) {
+        return l.trim().length > 0;
+      });
+
+    const branches = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // Typical formats:
+      // * main
+      //   feature/login
+      // * main                abc1234 [origin/main] Latest commit message
+      const m = line.match(/^([* ])\s+(\S+)(?:\s+(.*))?$/);
+      if (!m) {
+        continue;
+      }
+      const isCurrent = m[1] === '*';
+      const name = m[2];
+      const rest = (m[3] || '').trim();
+      branches.push({
+        name: name,
+        isCurrent: isCurrent,
+        meta: rest || null
+      });
+    }
+
+    if (branches.length === 0) {
+      return null;
+    }
+
+    const current = branches.find(function (b) {
+      return b.isCurrent;
+    });
+    const summary =
+      'You are on ' +
+      (current ? current.name : 'an unknown branch') +
+      '. ' +
+      branches.length +
+      ' local branch' +
+      (branches.length === 1 ? '' : 'es') +
+      '.';
+
+    const items = branches.map(function (b) {
+      const actions = [];
+      if (!b.isCurrent) {
+        actions.push({
+          id: 'switch-' + b.name,
+          label: 'Switch to this branch',
+          command: 'git switch ' + b.name
+        });
+        actions.push({
+          id: 'delete-' + b.name,
+          label: 'Delete branch',
+          command: 'git branch -d ' + b.name,
+          confirm: true
+        });
+      } else {
+        actions.push({
+          id: 'status',
+          label: 'Show status',
+          command: 'git status'
+        });
+      }
+      return {
+        title: b.name + (b.isCurrent ? ' (current)' : ''),
+        meta: b.meta,
+        current: b.isCurrent,
+        actions: actions
+      };
+    });
+
+    return {
+      title: 'Git branches',
+      summary: summary,
+      items: items,
+      globalActions: [
+        { id: 'fetch', label: 'Fetch from remote', command: 'git fetch' },
+        { id: 'status', label: 'Show status', command: 'git status' }
+      ]
+    };
+  }
+
+  function renderStructuredView(view) {
+    if (!structuredPanel || !structuredContent || !view) {
+      clearStructuredView();
+      return;
+    }
+
+    structuredContent.innerHTML = '';
+
+    const heading = document.createElement('h3');
+    heading.textContent = view.title || 'Results';
+    structuredContent.appendChild(heading);
+
+    if (view.summary) {
+      const summary = document.createElement('p');
+      summary.className = 'summary';
+      summary.textContent = view.summary;
+      structuredContent.appendChild(summary);
+    }
+
+    if (view.items && view.items.length) {
+      const list = document.createElement('ul');
+      list.setAttribute('aria-label', view.title || 'Items');
+
+      view.items.forEach(function (item) {
+        const li = document.createElement('li');
+        if (item.current) {
+          li.className = 'current';
+        }
+
+        const title = document.createElement('p');
+        title.className = 'item-title';
+        title.textContent = item.title || '';
+        li.appendChild(title);
+
+        if (item.meta) {
+          const meta = document.createElement('p');
+          meta.className = 'item-meta';
+          meta.textContent = item.meta;
+          li.appendChild(meta);
+        }
+
+        if (item.actions && item.actions.length) {
+          const actions = document.createElement('div');
+          actions.className = 'item-actions';
+          item.actions.forEach(function (action) {
+            actions.appendChild(createActionButton(action));
+          });
+          li.appendChild(actions);
+        }
+
+        list.appendChild(li);
+      });
+
+      structuredContent.appendChild(list);
+    } else {
+      const empty = document.createElement('p');
+      empty.className = 'empty-note';
+      empty.textContent = 'No detailed items.';
+      structuredContent.appendChild(empty);
+    }
+
+    if (view.globalActions && view.globalActions.length) {
+      const global = document.createElement('div');
+      global.className = 'global-actions';
+      global.setAttribute('aria-label', 'Actions');
+      view.globalActions.forEach(function (action) {
+        global.appendChild(createActionButton(action));
+      });
+      structuredContent.appendChild(global);
+    }
+
+    structuredPanel.hidden = false;
+    announce(
+      (view.title || 'Structured results') +
+        ' available. ' +
+        (view.summary || '') +
+        ' Use Tab to reach action buttons, or Alt+O for raw output.'
+    );
+  }
+
+  function createActionButton(action) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = action.label || action.id || 'Run';
+    if (action.confirm) {
+      btn.className = 'danger';
+    }
+    btn.addEventListener('click', function () {
+      runStructuredAction(action);
+    });
+    return btn;
+  }
+
+  function runStructuredAction(action) {
+    if (!action || !action.command) {
+      return;
+    }
+    if (action.confirm) {
+      const ok = window.confirm(
+        'Run this command?\n\n' + action.command + '\n\nThis may be destructive.'
+      );
+      if (!ok) {
+        announce('Cancelled.');
+        commandEl.focus();
+        return;
+      }
+    }
+    runCommand(action.command);
+  }
+
+  function tryBuildStructuredView(command) {
+    const outputText = commandOutputChunks.join('');
+    const view = interpretOutput(command, outputText);
+    if (view) {
+      renderStructuredView(view);
+    } else {
+      clearStructuredView();
+    }
+  }
+
+  // --- End structured view -------------------------------------------------
+
   function finishCommand() {
     if (!commandRunning) {
       return;
@@ -254,7 +638,13 @@
     const status = lastExitOk ? 'succeeded' : 'failed';
     const label = pendingCommand ? pendingCommand : 'Command';
     announce(label + ' ' + status + '.');
+
+    if (pendingCommand) {
+      tryBuildStructuredView(pendingCommand);
+    }
+
     pendingCommand = null;
+    commandOutputChunks = [];
     if (ready && socket.readyState === WebSocket.OPEN) {
       runBtn.disabled = false;
       commandEl.focus();
@@ -320,6 +710,9 @@
         continue;
       }
       displayLines.push(line);
+      if (commandRunning) {
+        commandOutputChunks.push(line + '\n');
+      }
     }
     const tailPrompt = rawBuffer.match(PROMPT_RE);
     if (tailPrompt) {
@@ -462,6 +855,8 @@
       return;
     }
     resetCompletion();
+    clearStructuredView();
+    commandOutputChunks = [];
     const echo = (currentPath ? currentPath : 'PS') + '> ' + text + '\n';
     appendOutput(echo);
     pendingCommand = text;
@@ -517,6 +912,7 @@
 
   clearBtn.addEventListener('click', function () {
     outputEl.value = '';
+    clearStructuredView();
     announce('Output cleared.');
     commandEl.focus();
   });

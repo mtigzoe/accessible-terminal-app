@@ -57,7 +57,7 @@
   .panel { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; margin-bottom: 14px; }
   .panel h2 { font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 8px; }
   #path-value { font-family: Consolas, "Courier New", monospace; font-size: 1.05rem; word-break: break-all; margin: 0; }
-  #output { display: block; width: 100%; min-height: 320px; height: 45vh; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; font-family: Consolas, "Courier New", monospace; line-height: 1.35; padding: 10px; resize: vertical; white-space: pre; overflow-wrap: normal; overflow-x: auto; }
+  #output { display: block; width: 100%; min-height: 200px; height: 28vh; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; font-family: Consolas, "Courier New", monospace; line-height: 1.35; padding: 10px; resize: vertical; white-space: pre; overflow-wrap: normal; overflow-x: auto; }
   #output:focus { outline: 2px solid var(--focus); outline-offset: 2px; }
   .command-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
   .command-field { flex: 1 1 16rem; min-width: 0; }
@@ -70,6 +70,57 @@
   button:focus { outline: 2px solid var(--focus); outline-offset: 2px; }
   button:disabled { opacity: 0.55; cursor: not-allowed; }
   .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+  /* Structured results panel */
+  #structured-panel[hidden] { display: none; }
+  #structured-content { margin: 0; }
+  #structured-content h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 0 0 10px;
+    color: var(--text);
+  }
+  #structured-content .summary {
+    margin: 0 0 12px;
+    color: var(--muted);
+  }
+  #structured-content ul {
+    list-style: none;
+    margin: 0 0 12px;
+    padding: 0;
+  }
+  #structured-content li {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+  }
+  #structured-content li.current {
+    border-color: var(--accent);
+  }
+  #structured-content .item-title {
+    font-weight: 600;
+    margin: 0 0 4px;
+  }
+  #structured-content .item-meta {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin: 0 0 8px;
+  }
+  #structured-content .item-actions,
+  #structured-content .global-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  #structured-content button.danger {
+    border-color: var(--error);
+    color: var(--error);
+  }
+  #structured-content .empty-note {
+    color: var(--muted);
+    margin: 0;
+  }
 </style>
 </head>
 <body>
@@ -86,6 +137,12 @@
       <h2 id="path-heading">Current path</h2>
       <p id="path-value" aria-live="polite">Waiting for shell…</p>
     </section>
+
+    <section class="panel" id="structured-panel" hidden aria-labelledby="structured-heading">
+      <h2 id="structured-heading">Structured results</h2>
+      <div id="structured-content"></div>
+    </section>
+
     <section class="panel" aria-labelledby="output-heading">
       <h2 id="output-heading">Output</h2>
       <textarea id="output" readonly spellcheck="false" aria-label="Command output, read-only"></textarea>
