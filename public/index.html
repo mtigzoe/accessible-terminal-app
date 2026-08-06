@@ -29,299 +29,71 @@
     --error: #f48771;
     --ok: #89d185;
   }
-
   html[data-high-contrast="true"] {
-    --bg: #000000;
-    --panel: #000000;
-    --text: #ffffff;
-    --muted: #ffffff;
-    --accent: #ffff00;
-    --border: #ffffff;
-    --focus: #ffff00;
-    --error: #ff6b6b;
-    --ok: #00ff00;
+    --bg: #000000; --panel: #000000; --text: #ffffff; --muted: #ffffff;
+    --accent: #ffff00; --border: #ffffff; --focus: #ffff00; --error: #ff6b6b; --ok: #00ff00;
   }
-
   html[data-font-size="small"] { font-size: 14px; }
   html[data-font-size="medium"] { font-size: 16px; }
   html[data-font-size="large"] { font-size: 18px; }
   html[data-font-size="x-large"] { font-size: 22px; }
-
   html[data-high-contrast="true"] .menu-toggle,
-  html[data-high-contrast="true"] button {
-    background: #000;
-  }
-
-  html[data-high-contrast="true"] button.primary {
-    background: #000;
-    border-color: #ffff00;
-    color: #ffff00;
-  }
-
+  html[data-high-contrast="true"] button { background: #000; }
+  html[data-high-contrast="true"] button.primary { background: #000; border-color: #ffff00; color: #ffff00; }
   html[data-high-contrast="true"] .menu-panel a:hover,
-  html[data-high-contrast="true"] .menu-panel a:focus {
-    background: #333;
-    color: #ffff00;
-  }
-
-  #output, #command {
-    font-size: 1rem;
-  }
-
-  * {
-    box-sizing: border-box;
-  }
-
-  body {
-    margin: 0;
-    padding: 24px;
-    padding-top: 64px;
-    background: var(--panel);
-    color: var(--text);
-    font-family: "Segoe UI", system-ui, sans-serif;
-    line-height: 1.4;
-    max-width: 56rem;
-  }
-
-  .app-menu {
-    position: fixed;
-    top: 12px;
-    left: 12px;
-    z-index: 100;
-  }
-
-  .menu-toggle {
-    background: #2a2a2a;
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 8px 14px;
-    cursor: pointer;
-    font-size: 0.95rem;
-    font-family: inherit;
-  }
-
-  .menu-toggle:hover {
-    border-color: var(--accent);
-  }
-
-  .menu-toggle:focus {
-    outline: 2px solid var(--focus);
-    outline-offset: 2px;
-  }
-
-  .menu-toggle[aria-expanded="true"] {
-    border-color: var(--accent);
-  }
-
-  .menu-panel {
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    margin-top: 4px;
-    min-width: 12rem;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 6px 0;
-    list-style: none;
-    margin: 4px 0 0;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
-  }
-
-  .menu-panel[data-open="true"] {
-    display: block;
-  }
-
-  .menu-panel a {
-    display: block;
-    padding: 8px 14px;
-    color: var(--text);
-    text-decoration: none;
-    font-size: 0.95rem;
-  }
-
-  .menu-panel a:hover,
-  .menu-panel a:focus {
-    background: #1e4d6b;
-    outline: none;
-  }
-
-  .panel {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 14px 16px;
-    margin-bottom: 14px;
-  }
-
-  .panel h2 {
-    font-size: 0.85rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--muted);
-    margin: 0 0 8px;
-  }
-
-  #path-value {
-    font-family: Consolas, "Courier New", monospace;
-    font-size: 1.05rem;
-    word-break: break-all;
-    margin: 0;
-  }
-
-  #output {
-    display: block;
-    width: 100%;
-    min-height: 320px;
-    height: 45vh;
-    background: var(--bg);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    font-family: Consolas, "Courier New", monospace;
-    line-height: 1.35;
-    padding: 10px;
-    resize: vertical;
-    white-space: pre;
-    overflow-wrap: normal;
-    overflow-x: auto;
-  }
-
-  #output:focus {
-    outline: 2px solid var(--focus);
-    outline-offset: 2px;
-  }
-
-  .command-row {
-    display: flex;
-    gap: 10px;
-    align-items: flex-end;
-    flex-wrap: wrap;
-  }
-
-  .command-field {
-    flex: 1 1 16rem;
-    min-width: 0;
-  }
-
-  #command {
-    width: 100%;
-    background: var(--bg);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    font-family: Consolas, "Courier New", monospace;
-    padding: 10px 12px;
-  }
-
-  #command:focus {
-    outline: 2px solid var(--focus);
-    outline-offset: 2px;
-    border-color: var(--focus);
-  }
-
-  .actions {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-
-  button {
-    background: #2a2a2a;
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 10px 14px;
-    cursor: pointer;
-    font-size: 0.95rem;
-    font-family: inherit;
-  }
-
-  button.primary {
-    background: #1e4d6b;
-    border-color: #2a6a90;
-  }
-
-  button:hover {
-    border-color: var(--accent);
-  }
-
-  button:focus {
-    outline: 2px solid var(--focus);
-    outline-offset: 2px;
-  }
-
-  button:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-  }
-
-  .visually-hidden {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-  }
+  html[data-high-contrast="true"] .menu-panel a:focus { background: #333; color: #ffff00; }
+  #output, #command { font-size: 1rem; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px; padding-top: 64px; background: var(--panel); color: var(--text); font-family: "Segoe UI", system-ui, sans-serif; line-height: 1.4; max-width: 56rem; }
+  .app-menu { position: fixed; top: 12px; left: 12px; z-index: 100; }
+  .menu-toggle { background: #2a2a2a; color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 8px 14px; cursor: pointer; font-size: 0.95rem; font-family: inherit; }
+  .menu-toggle:hover { border-color: var(--accent); }
+  .menu-toggle:focus { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .menu-toggle[aria-expanded="true"] { border-color: var(--accent); }
+  .menu-panel { display: none; position: absolute; top: 100%; left: 0; min-width: 12rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 0; list-style: none; margin: 4px 0 0; box-shadow: 0 6px 20px rgba(0,0,0,0.45); }
+  .menu-panel[data-open="true"] { display: block; }
+  .menu-panel a { display: block; padding: 8px 14px; color: var(--text); text-decoration: none; font-size: 0.95rem; }
+  .menu-panel a:hover, .menu-panel a:focus { background: #1e4d6b; outline: none; }
+  .panel { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; margin-bottom: 14px; }
+  .panel h2 { font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 8px; }
+  #path-value { font-family: Consolas, "Courier New", monospace; font-size: 1.05rem; word-break: break-all; margin: 0; }
+  #output { display: block; width: 100%; min-height: 320px; height: 45vh; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; font-family: Consolas, "Courier New", monospace; line-height: 1.35; padding: 10px; resize: vertical; white-space: pre; overflow-wrap: normal; overflow-x: auto; }
+  #output:focus { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .command-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+  .command-field { flex: 1 1 16rem; min-width: 0; }
+  #command { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; font-family: Consolas, "Courier New", monospace; padding: 10px 12px; }
+  #command:focus { outline: 2px solid var(--focus); outline-offset: 2px; border-color: var(--focus); }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  button { background: #2a2a2a; color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 10px 14px; cursor: pointer; font-size: 0.95rem; font-family: inherit; }
+  button.primary { background: #1e4d6b; border-color: #2a6a90; }
+  button:hover { border-color: var(--accent); }
+  button:focus { outline: 2px solid var(--focus); outline-offset: 2px; }
+  button:disabled { opacity: 0.55; cursor: not-allowed; }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 </style>
 </head>
 <body>
   <nav class="app-menu" aria-label="Main menu">
-    <button
-      type="button"
-      class="menu-toggle"
-      id="menu-toggle"
-      aria-expanded="false"
-      aria-controls="menu-panel"
-      aria-haspopup="menu">
-      Menu
-    </button>
+    <button type="button" class="menu-toggle" id="menu-toggle" aria-expanded="false" aria-controls="menu-panel" aria-haspopup="menu">Menu</button>
     <ul class="menu-panel" id="menu-panel" role="menu" data-open="false">
-      <li role="none">
-        <a role="menuitem" href="instructions.html" tabindex="-1">Instructions</a>
-      </li>
-      <li role="none">
-        <a role="menuitem" href="console.html" tabindex="-1">Full console</a>
-      </li>
-      <li role="none">
-        <a role="menuitem" href="settings.html" tabindex="-1">Settings</a>
-      </li>
+      <li role="none"><a role="menuitem" href="instructions.html" tabindex="-1">Instructions</a></li>
+      <li role="none"><a role="menuitem" href="console.html" tabindex="-1">Full console</a></li>
+      <li role="none"><a role="menuitem" href="settings.html" tabindex="-1">Settings</a></li>
     </ul>
   </nav>
-
   <main>
     <section class="panel" aria-labelledby="path-heading">
       <h2 id="path-heading">Current path</h2>
       <p id="path-value" aria-live="polite">Waiting for shell…</p>
     </section>
-
     <section class="panel" aria-labelledby="output-heading">
       <h2 id="output-heading">Output</h2>
-      <textarea
-        id="output"
-        readonly
-        spellcheck="false"
-        aria-label="Command output, read-only"></textarea>
+      <textarea id="output" readonly spellcheck="false" aria-label="Command output, read-only"></textarea>
     </section>
-
     <section class="panel">
       <form id="command-form" class="command-row">
         <div class="command-field">
-          <input
-            type="text"
-            id="command"
-            name="command"
-            autocomplete="off"
-            spellcheck="false"
-            aria-label="Command"
-            disabled>
+          <input type="text" id="command" name="command" autocomplete="off" spellcheck="false" aria-label="Command" disabled>
         </div>
         <div class="actions">
           <button type="submit" id="run-btn" class="primary" disabled>Run</button>
@@ -331,14 +103,8 @@
       </form>
     </section>
   </main>
-
   <div id="sr-status" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
   <div id="sr-alert" class="visually-hidden" role="alert" aria-live="assertive" aria-atomic="true"></div>
-
-<script>
-/* Accessible shell UI — full source kept from version_6 with Ctrl+C/stdin support.
-   When terminal-console-mode=full, the head script redirects to console.html. */
-document.write('<script src="/__missing_inline__"><\/script>');
-</script>
+<script src="app-shell.js"></script>
 </body>
 </html>
