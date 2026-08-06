@@ -1,1 +1,986 @@
-<PLACEHOLDER>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Accessible PowerShell</title>
+<script>
+(function () {
+  try {
+    var hc = localStorage.getItem('terminal-high-contrast') === 'true';
+    var fs = localStorage.getItem('terminal-font-size') || 'medium';
+    document.documentElement.setAttribute('data-high-contrast', hc ? 'true' : 'false');
+    document.documentElement.setAttribute('data-font-size', fs);
+  } catch (e) {}
+})();
+</script>
+<style>
+  :root {
+    --bg: #0c0c0c;
+    --panel: #161616;
+    --text: #e6e6e6;
+    --muted: #a0a0a0;
+    --accent: #4fc1e9;
+    --border: #333;
+    --focus: #4fc1e9;
+    --error: #f48771;
+    --ok: #89d185;
+  }
+
+  html[data-high-contrast="true"] {
+    --bg: #000000;
+    --panel: #000000;
+    --text: #ffffff;
+    --muted: #ffffff;
+    --accent: #ffff00;
+    --border: #ffffff;
+    --focus: #ffff00;
+    --error: #ff6b6b;
+    --ok: #00ff00;
+  }
+
+  html[data-font-size="small"] { font-size: 14px; }
+  html[data-font-size="medium"] { font-size: 16px; }
+  html[data-font-size="large"] { font-size: 18px; }
+  html[data-font-size="x-large"] { font-size: 22px; }
+
+  html[data-high-contrast="true"] .menu-toggle,
+  html[data-high-contrast="true"] button {
+    background: #000;
+  }
+
+  html[data-high-contrast="true"] button.primary {
+    background: #000;
+    border-color: #ffff00;
+    color: #ffff00;
+  }
+
+  html[data-high-contrast="true"] .menu-panel a:hover,
+  html[data-high-contrast="true"] .menu-panel a:focus {
+    background: #333;
+    color: #ffff00;
+  }
+
+  #output, #command {
+    font-size: 1rem;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    padding: 24px;
+    padding-top: 64px;
+    background: var(--panel);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, sans-serif;
+    line-height: 1.4;
+    max-width: 56rem;
+  }
+
+  .app-menu {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 100;
+  }
+
+  .menu-toggle {
+    background: #2a2a2a;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-family: inherit;
+  }
+
+  .menu-toggle:hover {
+    border-color: var(--accent);
+  }
+
+  .menu-toggle:focus {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .menu-toggle[aria-expanded="true"] {
+    border-color: var(--accent);
+  }
+
+  .menu-panel {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    min-width: 12rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 0;
+    list-style: none;
+    margin: 4px 0 0;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  }
+
+  .menu-panel[data-open="true"] {
+    display: block;
+  }
+
+  .menu-panel a {
+    display: block;
+    padding: 8px 14px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 0.95rem;
+  }
+
+  .menu-panel a:hover,
+  .menu-panel a:focus {
+    background: #1e4d6b;
+    outline: none;
+  }
+
+  .panel {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+  }
+
+  .panel h2 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    margin: 0 0 8px;
+  }
+
+  #path-value {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 1.05rem;
+    word-break: break-all;
+    margin: 0;
+  }
+
+  #output {
+    display: block;
+    width: 100%;
+    min-height: 320px;
+    height: 45vh;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: Consolas, "Courier New", monospace;
+    line-height: 1.35;
+    padding: 10px;
+    resize: vertical;
+    white-space: pre;
+    overflow-wrap: normal;
+    overflow-x: auto;
+  }
+
+  #output:focus {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .command-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .command-field {
+    flex: 1 1 16rem;
+    min-width: 0;
+  }
+
+  #command {
+    width: 100%;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: Consolas, "Courier New", monospace;
+    padding: 10px 12px;
+  }
+
+  #command:focus {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-color: var(--focus);
+  }
+
+  .actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  button {
+    background: #2a2a2a;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 14px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-family: inherit;
+  }
+
+  button.primary {
+    background: #1e4d6b;
+    border-color: #2a6a90;
+  }
+
+  button:hover {
+    border-color: var(--accent);
+  }
+
+  button:focus {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+</style>
+</head>
+<body>
+  <nav class="app-menu" aria-label="Main menu">
+    <button
+      type="button"
+      class="menu-toggle"
+      id="menu-toggle"
+      aria-expanded="false"
+      aria-controls="menu-panel"
+      aria-haspopup="menu">
+      Menu
+    </button>
+    <ul class="menu-panel" id="menu-panel" role="menu" data-open="false">
+      <li role="none">
+        <a role="menuitem" href="instructions.html" tabindex="-1">Instructions</a>
+      </li>
+      <li role="none">
+        <a role="menuitem" href="settings.html" tabindex="-1">Settings</a>
+      </li>
+    </ul>
+  </nav>
+
+  <main>
+    <section class="panel" aria-labelledby="path-heading">
+      <h2 id="path-heading">Current path</h2>
+      <p id="path-value" aria-live="polite">Waiting for shell…</p>
+    </section>
+
+    <section class="panel" aria-labelledby="output-heading">
+      <h2 id="output-heading">Output</h2>
+      <textarea
+        id="output"
+        readonly
+        spellcheck="false"
+        aria-label="Command output, read-only"></textarea>
+    </section>
+
+    <section class="panel">
+      <form id="command-form" class="command-row">
+        <div class="command-field">
+          <input
+            type="text"
+            id="command"
+            name="command"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="Command"
+            disabled>
+        </div>
+        <div class="actions">
+          <button type="submit" id="run-btn" class="primary" disabled>Run</button>
+          <button type="button" id="stop-btn" disabled>Stop</button>
+          <button type="button" id="clear-btn" disabled>Clear output</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <div id="sr-status" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
+  <div id="sr-alert" class="visually-hidden" role="alert" aria-live="assertive" aria-atomic="true"></div>
+
+<script>
+(function () {
+  const menuToggle = document.getElementById('menu-toggle');
+  const menuPanel = document.getElementById('menu-panel');
+  const menuItems = Array.prototype.slice.call(
+    menuPanel.querySelectorAll('[role="menuitem"]')
+  );
+
+  function isMenuOpen() {
+    return menuToggle.getAttribute('aria-expanded') === 'true';
+  }
+
+  function setMenuOpen(open, focusItemIndex) {
+    menuToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    menuPanel.dataset.open = open ? 'true' : 'false';
+    if (open) {
+      const index =
+        typeof focusItemIndex === 'number' && focusItemIndex >= 0
+          ? focusItemIndex
+          : 0;
+      if (menuItems[index]) {
+        menuItems[index].focus();
+      }
+    } else {
+      menuToggle.focus();
+    }
+  }
+
+  function focusMenuItem(index) {
+    if (!menuItems.length) {
+      return;
+    }
+    const n = menuItems.length;
+    const i = ((index % n) + n) % n;
+    menuItems[i].focus();
+  }
+
+  function currentMenuIndex() {
+    const active = document.activeElement;
+    return menuItems.indexOf(active);
+  }
+
+  menuToggle.addEventListener('click', function () {
+    if (isMenuOpen()) {
+      setMenuOpen(false);
+    } else {
+      setMenuOpen(true, 0);
+    }
+  });
+
+  menuToggle.addEventListener('keydown', function (event) {
+    if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      setMenuOpen(true, 0);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setMenuOpen(true, menuItems.length - 1);
+    }
+  });
+
+  menuPanel.addEventListener('keydown', function (event) {
+    if (!isMenuOpen()) {
+      return;
+    }
+    const idx = currentMenuIndex();
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      focusMenuItem(idx < 0 ? 0 : idx + 1);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      focusMenuItem(idx < 0 ? menuItems.length - 1 : idx - 1);
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      focusMenuItem(0);
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      focusMenuItem(menuItems.length - 1);
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      setMenuOpen(false);
+    } else if (event.key === 'Tab') {
+      setMenuOpen(false);
+    }
+  });
+
+  document.addEventListener('click', function (event) {
+    if (!menuToggle.contains(event.target) && !menuPanel.contains(event.target)) {
+      if (isMenuOpen()) {
+        menuToggle.setAttribute('aria-expanded', 'false');
+        menuPanel.dataset.open = 'false';
+      }
+    }
+  });
+
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && isMenuOpen()) {
+      event.preventDefault();
+      setMenuOpen(false);
+    }
+  });
+
+  const pathEl = document.getElementById('path-value');
+  const outputEl = document.getElementById('output');
+  const commandEl = document.getElementById('command');
+  const formEl = document.getElementById('command-form');
+  const runBtn = document.getElementById('run-btn');
+  const stopBtn = document.getElementById('stop-btn');
+  const clearBtn = document.getElementById('clear-btn');
+  const srStatus = document.getElementById('sr-status');
+  const srAlert = document.getElementById('sr-alert');
+
+  const history = [];
+  let historyIndex = -1;
+  let draftBeforeHistory = '';
+
+  let rawBuffer = '';
+  let currentPath = '';
+  let lastExitOk = true;
+  let commandRunning = false;
+  let ready = false;
+  let pendingCommand = null;
+  let restoredPath = null;
+  let pathRestoreAttempted = false;
+
+  let completionRequestId = 0;
+  let completionPending = false;
+  let applyingCompletion = false;
+  const completion = {
+    baseLine: '',
+    replacementIndex: 0,
+    replacementLength: 0,
+    matches: [],
+    index: 0
+  };
+
+  const PROMPT_RE = /^PS\s+(.+?)(>+)\s*$/;
+
+  function announce(text) {
+    srStatus.textContent = '';
+    window.setTimeout(function () {
+      srStatus.textContent = text;
+    }, 100);
+  }
+
+  function announceAlert(text) {
+    srAlert.textContent = '';
+    window.setTimeout(function () {
+      srAlert.textContent = text;
+    }, 60);
+  }
+
+  function setControlsEnabled(enabled) {
+    commandEl.disabled = !enabled;
+    runBtn.disabled = !enabled;
+    stopBtn.disabled = !enabled;
+    clearBtn.disabled = !enabled;
+  }
+
+  function sendInterrupt() {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      announce('Not connected.');
+      return;
+    }
+    // ASCII ETX — same as Ctrl+C in a real terminal
+    socket.send('\u0003');
+    appendOutput('^C\n');
+    announce('Sent interrupt (Ctrl+C).');
+  }
+
+  function sendStdin(text) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    const line = text == null ? '' : String(text);
+    appendOutput(line + '\n');
+    socket.send(line + '\r');
+  }
+
+  function pathsEqual(a, b) {
+    if (!a || !b) {
+      return false;
+    }
+    const norm = function (p) {
+      return String(p).replace(/[\\/]+$/, '').toLowerCase();
+    };
+    return norm(a) === norm(b);
+  }
+
+  function setPath(path) {
+    if (!path || path === currentPath) {
+      return;
+    }
+    currentPath = path;
+    pathEl.textContent = path;
+    try {
+      localStorage.setItem('terminal-last-path', path);
+    } catch {
+      // storage may be unavailable
+    }
+  }
+
+  function restorePath() {
+    try {
+      const saved = localStorage.getItem('terminal-last-path');
+      if (saved && saved.trim()) {
+        restoredPath = saved.trim();
+        currentPath = restoredPath;
+        pathEl.textContent = restoredPath;
+      }
+    } catch {
+      // storage may be unavailable
+    }
+  }
+
+  function appendOutput(text) {
+    if (!text) {
+      return;
+    }
+    if (outputEl.value) {
+      outputEl.value += text;
+    } else {
+      outputEl.value = text.replace(/^\n+/, '');
+    }
+    outputEl.scrollTop = outputEl.scrollHeight;
+  }
+
+  function stripAnsi(text) {
+    return text
+      .replace(/\u001b\][^\u0007]*\u0007/g, '')
+      .replace(/\u001b\[[0-9;?]*[ -\/]*[@-~]/g, '')
+      .replace(/\u001b./g, '')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .replace(/[\u0000\u0007]/g, '');
+  }
+
+  function processOscMarkers(chunk) {
+    const oscRe = /\u001b\]633;([^\u0007]*)\u0007/g;
+    let match;
+    while ((match = oscRe.exec(chunk)) !== null) {
+      const parts = match[1].split(';');
+      const code = parts[0];
+
+      if (code === 'D') {
+        lastExitOk = parts[1] === '0';
+      } else if (code === 'A') {
+        finishCommand();
+      }
+    }
+    return chunk.replace(/\u001b\]633;[^\u0007]*\u0007/g, '');
+  }
+
+  function finishCommand() {
+    if (!commandRunning) {
+      return;
+    }
+    commandRunning = false;
+    const status = lastExitOk ? 'succeeded' : 'failed';
+    const label = pendingCommand ? pendingCommand : 'Command';
+    announce(label + ' ' + status + '.');
+    pendingCommand = null;
+    if (ready && socket.readyState === WebSocket.OPEN) {
+      runBtn.disabled = false;
+      commandEl.focus();
+    }
+  }
+
+  function requestPathRestore(target) {
+    if (!target || !socket || socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    socket.send(JSON.stringify({ type: 'cwd', cwd: target }));
+  }
+
+  function focusOutput() {
+    if (commandEl.disabled) {
+      return;
+    }
+    outputEl.focus();
+    const end = outputEl.value.length;
+    try {
+      outputEl.setSelectionRange(end, end);
+    } catch {
+      // some browsers restrict selection on readonly textarea
+    }
+    announce('Output focused.');
+  }
+
+  function onPromptSeen(path) {
+    if (restoredPath && pathsEqual(path, restoredPath)) {
+      restoredPath = null;
+      pathRestoreAttempted = true;
+    }
+    setPath(path);
+    finishCommand();
+    if (!ready) {
+      ready = true;
+      setControlsEnabled(true);
+
+      if (restoredPath && !pathsEqual(path, restoredPath) && !pathRestoreAttempted) {
+        pathRestoreAttempted = true;
+        const target = restoredPath;
+        requestPathRestore(target);
+        announce('Shell ready. Restoring path ' + target + '.');
+      } else {
+        announce('Shell ready. Current path ' + path + '. Type a command.');
+      }
+      commandEl.focus();
+    }
+  }
+
+  function handleIncoming(data) {
+    rawBuffer += processOscMarkers(data);
+    const clean = stripAnsi(rawBuffer);
+
+    const lines = clean.split('\n');
+    rawBuffer = lines.pop() || '';
+
+    const displayLines = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const promptMatch = line.match(PROMPT_RE);
+
+      if (promptMatch) {
+        onPromptSeen(promptMatch[1]);
+        continue;
+      }
+
+      if (
+        commandRunning &&
+        pendingCommand &&
+        line.trim() === pendingCommand
+      ) {
+        continue;
+      }
+
+      displayLines.push(line);
+    }
+
+    const tailPrompt = rawBuffer.match(PROMPT_RE);
+    if (tailPrompt) {
+      onPromptSeen(tailPrompt[1]);
+      rawBuffer = '';
+    }
+
+    if (displayLines.length > 0) {
+      appendOutput(displayLines.join('\n') + '\n');
+    }
+  }
+
+  function resetCompletion() {
+    completion.baseLine = '';
+    completion.replacementIndex = 0;
+    completion.replacementLength = 0;
+    completion.matches = [];
+    completion.index = 0;
+  }
+
+  function applyCompletionMatch(index) {
+    if (!completion.matches.length) {
+      return;
+    }
+    const match = completion.matches[index];
+
+    completion.index = index;
+
+    if (completion.matches.length === 1) {
+      announceAlert(match);
+    } else {
+      announceAlert(
+        (index + 1) + ' of ' + completion.matches.length + ', ' + match
+      );
+    }
+
+    const before = completion.baseLine.slice(0, completion.replacementIndex);
+    const after = completion.baseLine.slice(
+      completion.replacementIndex + completion.replacementLength
+    );
+    const newLine = before + match + after;
+    const caret = before.length + match.length;
+
+    applyingCompletion = true;
+    commandEl.value = newLine;
+    commandEl.setSelectionRange(caret, caret);
+    applyingCompletion = false;
+  }
+
+  function cycleCompletion(direction) {
+    const n = completion.matches.length;
+    if (n === 0) {
+      return;
+    }
+    const next = (completion.index + direction + n) % n;
+    applyCompletionMatch(next);
+  }
+
+  function requestTabCompletion(direction) {
+    if (commandRunning) {
+      announce('Wait for the current command to finish.');
+      return;
+    }
+
+    if (completion.matches.length > 0) {
+      cycleCompletion(direction);
+      return;
+    }
+
+    if (completionPending) {
+      return;
+    }
+
+    const line = commandEl.value;
+    const cursor =
+      typeof commandEl.selectionStart === 'number'
+        ? commandEl.selectionStart
+        : line.length;
+
+    const baseLine = line;
+    completionPending = true;
+    completionRequestId += 1;
+    const id = completionRequestId;
+
+    fetch('/api/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: id,
+        line: line,
+        cursor: cursor,
+        cwd: currentPath || undefined
+      })
+    })
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error('Completion request failed (' + response.status + ').');
+        }
+        return response.json();
+      })
+      .then(function (msg) {
+        handleCompleteResult(msg, baseLine);
+      })
+      .catch(function (err) {
+        completionPending = false;
+        resetCompletion();
+        announce(
+          err && err.message
+            ? err.message
+            : 'Completion request failed. Is the server running the latest code?'
+        );
+      });
+  }
+
+  function handleCompleteResult(msg, baseLine) {
+    completionPending = false;
+
+    if (msg && msg.id != null && msg.id !== completionRequestId) {
+      return;
+    }
+
+    const matches = Array.isArray(msg.matches)
+      ? msg.matches
+      : typeof msg.matches === 'string'
+        ? [msg.matches]
+        : [];
+
+    if (matches.length === 0) {
+      resetCompletion();
+      announce(msg.error ? 'No completions. ' + msg.error : 'No completions.');
+      return;
+    }
+
+    completion.baseLine = typeof baseLine === 'string' ? baseLine : commandEl.value;
+    completion.replacementIndex =
+      typeof msg.replacementIndex === 'number' ? msg.replacementIndex : 0;
+    completion.replacementLength =
+      typeof msg.replacementLength === 'number' ? msg.replacementLength : 0;
+    completion.matches = matches;
+    applyCompletionMatch(0);
+  }
+
+  function runCommand(commandText) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    // While a command is running, treat Enter as stdin to that process
+    // (e.g. Read-Host, python input(), confirmation prompts).
+    if (commandRunning) {
+      const text = commandText;
+      commandEl.value = '';
+      sendStdin(text);
+      announce('Sent input to running command.');
+      return;
+    }
+
+    const text = commandText.trim();
+    if (!text) {
+      return;
+    }
+
+    resetCompletion();
+
+    const echo = (currentPath ? currentPath : 'PS') + '> ' + text + '\n';
+    appendOutput(echo);
+
+    pendingCommand = text;
+    commandRunning = true;
+    lastExitOk = true;
+    runBtn.disabled = true;
+
+    history.push(text);
+    historyIndex = history.length;
+    draftBeforeHistory = '';
+    commandEl.value = '';
+
+    announce('Running ' + text);
+    socket.send(text + '\r');
+  }
+
+  restorePath();
+
+  const protocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
+  const socket = new WebSocket(protocol + location.host + '/ws');
+
+  socket.addEventListener('open', function () {
+    if (restoredPath) {
+      requestPathRestore(restoredPath);
+    }
+    announce('Connecting. Waiting for PowerShell prompt.');
+  });
+
+  socket.addEventListener('message', function (event) {
+    const data = typeof event.data === 'string' ? event.data : String(event.data);
+    handleIncoming(data);
+  });
+
+  socket.addEventListener('close', function () {
+    setControlsEnabled(false);
+    appendOutput('\n[connection closed]\n');
+    announce('Connection closed.');
+  });
+
+  socket.addEventListener('error', function () {
+    announce('Connection error.');
+  });
+
+  formEl.addEventListener('submit', function (event) {
+    event.preventDefault();
+    runCommand(commandEl.value);
+  });
+
+  stopBtn.addEventListener('click', function () {
+    sendInterrupt();
+    commandEl.focus();
+  });
+
+  clearBtn.addEventListener('click', function () {
+    outputEl.value = '';
+    announce('Output cleared.');
+    commandEl.focus();
+  });
+
+  commandEl.addEventListener('input', function () {
+    if (applyingCompletion) {
+      return;
+    }
+    resetCompletion();
+  });
+
+  commandEl.addEventListener('keydown', function (event) {
+    if (event.ctrlKey && !event.altKey && !event.metaKey && (event.key === 'c' || event.key === 'C')) {
+      const start = commandEl.selectionStart;
+      const end = commandEl.selectionEnd;
+      if (typeof start === 'number' && typeof end === 'number' && start !== end) {
+        return;
+      }
+      event.preventDefault();
+      sendInterrupt();
+      return;
+    }
+
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      requestTabCompletion(event.shiftKey ? -1 : 1);
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      resetCompletion();
+      if (history.length === 0) {
+        return;
+      }
+      if (historyIndex === history.length) {
+        draftBeforeHistory = commandEl.value;
+      }
+      historyIndex = Math.max(0, historyIndex - 1);
+      commandEl.value = history[historyIndex];
+      commandEl.setSelectionRange(commandEl.value.length, commandEl.value.length);
+    } else if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      resetCompletion();
+      if (history.length === 0) {
+        return;
+      }
+      if (historyIndex >= history.length - 1) {
+        historyIndex = history.length;
+        commandEl.value = draftBeforeHistory;
+      } else {
+        historyIndex += 1;
+        commandEl.value = history[historyIndex];
+      }
+      commandEl.setSelectionRange(commandEl.value.length, commandEl.value.length);
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      resetCompletion();
+      commandEl.value = '';
+      historyIndex = history.length;
+      draftBeforeHistory = '';
+      announce('Command cleared.');
+    }
+  });
+
+  document.addEventListener('keydown', function (event) {
+    if (event.ctrlKey && !event.altKey && !event.metaKey && (event.key === 'c' || event.key === 'C')) {
+      const active = document.activeElement;
+      if (commandRunning && active !== commandEl) {
+        const sel = window.getSelection && window.getSelection();
+        if (sel && String(sel).length > 0) {
+          return;
+        }
+        event.preventDefault();
+        sendInterrupt();
+        return;
+      }
+    }
+
+    if (event.altKey && !event.ctrlKey && !event.metaKey) {
+      const key = event.key.toLowerCase();
+      if (key === 'f2' || event.key === 'F2' || key === 'o') {
+        event.preventDefault();
+        focusOutput();
+      } else if (key === 'c') {
+        event.preventDefault();
+        commandEl.focus();
+        announce('Command field focused.');
+      }
+    }
+  });
+})();
+</script>
+</body>
+</html>
