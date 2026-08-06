@@ -319,6 +319,7 @@
   let ready = false;
   let pendingCommand = null;
   let restoredPath = null;
+  let pathRestoreAttempted = false;
 
   // Tab completion state (PowerShell TabExpansion2 via the server)
   let completionRequestId = 0;
@@ -362,6 +363,17 @@
     focusOutputBtn.disabled = !enabled;
   }
 
+  function pathsEqual(a, b) {
+    if (!a || !b) {
+      return false;
+    }
+    // Case-insensitive on Windows; ignore trailing separators.
+    const norm = function (p) {
+      return String(p).replace(/[\\/]+$/, '').toLowerCase();
+    };
+    return norm(a) === norm(b);
+  }
+
   function setPath(path) {
     if (!path || path === currentPath) {
       return;
@@ -378,10 +390,10 @@
   function restorePath() {
     try {
       const saved = localStorage.getItem('terminal-last-path');
-      if (saved) {
-        restoredPath = saved;
-        currentPath = saved;
-        pathEl.textContent = saved;
+      if (saved && saved.trim()) {
+        restoredPath = saved.trim();
+        currentPath = restoredPath;
+        pathEl.textContent = restoredPath;
       }
     } catch {
       // storage may be unavailable
@@ -450,9 +462,18 @@
     }
   }
 
+  function requestPathRestore(target) {
+    if (!target || !socket || socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    // Control message: server spawns with this cwd or runs Set-Location.
+    socket.send(JSON.stringify({ type: 'cwd', cwd: target }));
+  }
+
   function onPromptSeen(path) {
-    if (restoredPath && path === restoredPath) {
+    if (restoredPath && pathsEqual(path, restoredPath)) {
       restoredPath = null;
+      pathRestoreAttempted = true;
     }
     setPath(path);
     // Fallback when shell-integration markers are missing: prompt means idle.
@@ -461,7 +482,17 @@
       ready = true;
       setControlsEnabled(true);
       setConnection('connected', 'Connected to PowerShell.');
-      announce('Shell ready. Current path ' + path + '. Type a command.');
+
+      // If the shell started somewhere else, force a one-time Set-Location.
+      if (restoredPath && !pathsEqual(path, restoredPath) && !pathRestoreAttempted) {
+        pathRestoreAttempted = true;
+        const target = restoredPath;
+        // Ask the server to change location in the running session.
+        requestPathRestore(target);
+        announce('Shell ready. Restoring path ' + target + '.');
+      } else {
+        announce('Shell ready. Current path ' + path + '. Type a command.');
+      }
       commandEl.focus();
     }
   }
@@ -684,7 +715,7 @@
 
   socket.addEventListener('open', function () {
     if (restoredPath) {
-      socket.send(JSON.stringify({ type: 'cwd', cwd: restoredPath }));
+      requestPathRestore(restoredPath);
     }
     setConnection('connecting', 'Connected. Waiting for PowerShell prompt…');
   });

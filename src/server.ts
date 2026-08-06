@@ -27,10 +27,6 @@ const defaultCwd = os.homedir();
 // command success/failure via OSC 633 markers.
 const shellIntegrationScript = path.join(__dirname, '..', 'shell-integration', 'pwsh-integration.ps1');
 
-const shellArgs = process.platform === 'win32'
-  ? ['-NoLogo', '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', shellIntegrationScript]
-  : [];
-
 interface CompleteRequest {
   type: 'complete';
   id?: number;
@@ -53,7 +49,7 @@ function resolveCwd(candidate: unknown): string {
     return defaultCwd;
   }
   try {
-    const resolved = path.resolve(candidate);
+    const resolved = path.resolve(candidate.trim());
     if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
       return resolved;
     }
@@ -282,15 +278,39 @@ function rawDataToString(raw: RawData): string {
   return Buffer.from(raw).toString('utf8');
 }
 
+/** Escape a path for use inside a single-quoted PowerShell string. */
+function psSingleQuoted(value: string): string {
+  return "'" + value.replace(/'/g, "''") + "'";
+}
+
 wss.on('connection', (ws: WebSocket) => {
   let ptyProcess: any = null;
 
+  function buildShellArgs(cwd: string): string[] {
+    if (process.platform !== 'win32') {
+      return [];
+    }
+    // -WorkingDirectory is more reliable than process cwd alone when
+    // starting with -File (PowerShell's location can ignore process cwd).
+    return [
+      '-NoLogo',
+      '-NoExit',
+      '-WorkingDirectory',
+      cwd,
+      '-ExecutionPolicy',
+      'Bypass',
+      '-File',
+      shellIntegrationScript
+    ];
+  }
+
   function spawnPty(cwd: string) {
-    ptyProcess = pty.spawn(shell, shellArgs, {
+    const resolved = resolveCwd(cwd);
+    ptyProcess = pty.spawn(shell, buildShellArgs(resolved), {
       name: 'xterm-color',
       cols: 90,
       rows: 24,
-      cwd: resolveCwd(cwd),
+      cwd: resolved,
       env: process.env
     });
 
@@ -307,12 +327,31 @@ wss.on('connection', (ws: WebSocket) => {
     });
   }
 
+  function forceSetLocation(target: string) {
+    if (!ptyProcess) {
+      return;
+    }
+    const resolved = resolveCwd(target);
+    // LiteralPath avoids wildcard expansion; silent if already there.
+    const cmd =
+      'Set-Location -LiteralPath ' +
+      psSingleQuoted(resolved) +
+      '\r';
+    ptyProcess.write(cmd);
+  }
+
   ws.on('message', (raw: RawData) => {
     const text = rawDataToString(raw);
 
     if (text.length > 0 && text.charAt(0) === '{') {
       try {
-        const parsed = JSON.parse(text) as { type?: string; cols?: number; rows?: number; cwd?: string };
+        const parsed = JSON.parse(text) as {
+          type?: string;
+          cols?: number;
+          rows?: number;
+          cwd?: string;
+          path?: string;
+        };
 
         if (parsed && typeof parsed === 'object' && typeof parsed.type === 'string') {
           if (
@@ -326,9 +365,24 @@ wss.on('connection', (ws: WebSocket) => {
             return;
           }
 
-          if (parsed.type === 'cwd' && typeof parsed.cwd === 'string') {
-            if (!ptyProcess) {
-              spawnPty(parsed.cwd);
+          if (parsed.type === 'cwd') {
+            // Accept either "cwd" or legacy "path" property name.
+            const target =
+              typeof parsed.cwd === 'string'
+                ? parsed.cwd
+                : typeof parsed.path === 'string'
+                  ? parsed.path
+                  : '';
+
+            if (target) {
+              if (!ptyProcess) {
+                spawnPty(target);
+              } else {
+                // Session already running — change directory in-place.
+                forceSetLocation(target);
+              }
+            } else if (!ptyProcess) {
+              spawnPty(defaultCwd);
             }
             return;
           }
