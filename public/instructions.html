@@ -1,1 +1,119 @@
-PLACEHOLDER_INSTR
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Instructions — Accessible PowerShell</title>
+<script>
+(function () {
+  try {
+    var hc = localStorage.getItem('terminal-high-contrast') === 'true';
+    var fs = localStorage.getItem('terminal-font-size') || 'medium';
+    document.documentElement.setAttribute('data-high-contrast', hc ? 'true' : 'false');
+    document.documentElement.setAttribute('data-font-size', fs);
+  } catch (e) {}
+})();
+</script>
+<style>
+  :root { --bg: #0c0c0c; --panel: #161616; --text: #e6e6e6; --muted: #a0a0a0; --accent: #4fc1e9; --border: #333; --focus: #4fc1e9; }
+  html[data-high-contrast="true"] { --bg: #000; --panel: #000; --text: #fff; --muted: #fff; --accent: #ffff00; --border: #fff; --focus: #ffff00; }
+  html[data-font-size="small"] { font-size: 14px; }
+  html[data-font-size="medium"] { font-size: 16px; }
+  html[data-font-size="large"] { font-size: 18px; }
+  html[data-font-size="x-large"] { font-size: 22px; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px; padding-top: 64px; background: var(--panel); color: var(--text); font-family: "Segoe UI", system-ui, sans-serif; line-height: 1.5; max-width: 40rem; }
+  .app-menu { position: fixed; top: 12px; left: 12px; z-index: 100; }
+  .menu-toggle { background: #2a2a2a; color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 8px 14px; cursor: pointer; font-size: 0.95rem; font-family: inherit; }
+  .menu-toggle:focus { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .menu-panel { display: none; position: absolute; top: 100%; left: 0; margin: 4px 0 0; min-width: 12rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 0; list-style: none; box-shadow: 0 6px 20px rgba(0,0,0,0.45); }
+  .menu-panel[data-open="true"] { display: block; }
+  .menu-panel a { display: block; padding: 8px 14px; color: var(--text); text-decoration: none; }
+  .menu-panel a:hover, .menu-panel a:focus { background: #1e4d6b; outline: none; }
+  h1 { font-size: 1.35rem; font-weight: 600; margin: 0 0 8px; }
+  h2 { font-size: 1.05rem; font-weight: 600; margin: 1.5rem 0 0.5rem; color: var(--accent); }
+  .muted { color: var(--muted); }
+  .panel { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; margin: 1rem 0; }
+  ul, ol { margin: 0.4rem 0 0; padding-left: 1.25rem; }
+  li { margin-bottom: 0.45rem; }
+  kbd { background: #333; border: 1px solid #555; border-radius: 4px; padding: 1px 6px; font-family: Consolas, monospace; font-size: 0.9em; }
+  a.back { color: var(--accent); }
+</style>
+</head>
+<body>
+  <nav class="app-menu" aria-label="Main menu">
+    <button type="button" class="menu-toggle" id="menu-toggle" aria-expanded="false" aria-controls="menu-panel" aria-haspopup="menu">Menu</button>
+    <ul class="menu-panel" id="menu-panel" role="menu" data-open="false">
+      <li role="none"><a role="menuitem" href="index.html" tabindex="-1">Terminal</a></li>
+      <li role="none"><a role="menuitem" href="console.html" tabindex="-1">Full console</a></li>
+      <li role="none"><a role="menuitem" href="instructions.html" aria-current="page" tabindex="-1">Instructions</a></li>
+      <li role="none"><a role="menuitem" href="settings.html" tabindex="-1">Settings</a></li>
+    </ul>
+  </nav>
+  <header>
+    <h1>Accessible PowerShell</h1>
+    <p class="muted">Simple screen-reader friendly shell: current path, output history, and a command box.</p>
+  </header>
+  <main>
+    <p><a class="back" href="index.html">← Back to terminal</a></p>
+    <section class="panel" aria-labelledby="modes-heading">
+      <h2 id="modes-heading">Console modes</h2>
+      <p>Under <strong>Settings → Console mode</strong>, or the menu:</p>
+      <ul>
+        <li><strong>Accessible</strong> (default) — path, output, and command field. Best for screen readers.</li>
+        <li><strong>Full console</strong> — real terminal grid (xterm.js) for vim and interactive programs. Open <a href="console.html">Full console</a>.</li>
+      </ul>
+    </section>
+    <section class="panel" aria-labelledby="overview-heading">
+      <h2 id="overview-heading">Overview</h2>
+      <p>The accessible terminal page has three regions:</p>
+      <ul>
+        <li><strong>Current path</strong> — where you are in the filesystem</li>
+        <li><strong>Output</strong> — read-only history of commands and results</li>
+        <li><strong>Command</strong> — a text field to type PowerShell commands</li>
+      </ul>
+    </section>
+    <section class="panel" aria-labelledby="hints-heading">
+      <h2 id="hints-heading">Keyboard tips (accessible mode)</h2>
+      <ul>
+        <li><kbd>Enter</kbd> runs the command (or sends input while a command is running)</li>
+        <li><kbd>Ctrl</kbd>+<kbd>C</kbd> or <strong>Stop</strong> sends an interrupt</li>
+        <li><kbd>Tab</kbd> completes paths and commands</li>
+        <li><kbd>Alt</kbd>+<kbd>F2</kbd> or <kbd>Alt</kbd>+<kbd>O</kbd> focuses output</li>
+        <li><kbd>Alt</kbd>+<kbd>C</kbd> focuses the command field</li>
+      </ul>
+    </section>
+  </main>
+<script>
+(function () {
+  const menuToggle = document.getElementById('menu-toggle');
+  const menuPanel = document.getElementById('menu-panel');
+  const menuItems = Array.prototype.slice.call(menuPanel.querySelectorAll('[role="menuitem"]'));
+  function isMenuOpen() { return menuToggle.getAttribute('aria-expanded') === 'true'; }
+  function setMenuOpen(open, i) {
+    menuToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    menuPanel.dataset.open = open ? 'true' : 'false';
+    if (open && menuItems[i || 0]) menuItems[i || 0].focus();
+    else menuToggle.focus();
+  }
+  menuToggle.addEventListener('click', function () { setMenuOpen(!isMenuOpen(), 0); });
+  menuToggle.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMenuOpen(true, 0); }
+  });
+  menuPanel.addEventListener('keydown', function (e) {
+    if (!isMenuOpen()) return;
+    const idx = menuItems.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') { e.preventDefault(); menuItems[(idx + 1) % menuItems.length].focus(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); menuItems[(idx - 1 + menuItems.length) % menuItems.length].focus(); }
+    else if (e.key === 'Escape') { e.preventDefault(); setMenuOpen(false); }
+  });
+  document.addEventListener('click', function (e) {
+    if (!menuToggle.contains(e.target) && !menuPanel.contains(e.target) && isMenuOpen()) {
+      menuToggle.setAttribute('aria-expanded', 'false');
+      menuPanel.dataset.open = 'false';
+    }
+  });
+})();
+</script>
+</body>
+</html>
