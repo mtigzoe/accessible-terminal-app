@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Instructions — Accessible PowerShell</title>
+<style>
+  :root {
+    --bg: #0c0c0c;
+    --panel: #161616;
+    --text: #e6e6e6;
+    --muted: #a0a0a0;
+    --accent: #4fc1e9;
+    --border: #333;
+    --focus: #4fc1e9;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    padding: 24px;
+    padding-top: 64px;
+    background: var(--panel);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, sans-serif;
+    line-height: 1.5;
+    max-width: 40rem;
+  }
+
+  .app-menu {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 100;
+  }
+
+  .menu-toggle {
+    background: #2a2a2a;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-family: inherit;
+  }
+
+  .menu-toggle:hover {
+    border-color: var(--accent);
+  }
+
+  .menu-toggle:focus {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .menu-toggle[aria-expanded="true"] {
+    border-color: var(--accent);
+  }
+
+  .menu-panel {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    min-width: 12rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 0;
+    list-style: none;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  }
+
+  .menu-panel[data-open="true"] {
+    display: block;
+  }
+
+  .menu-panel a {
+    display: block;
+    padding: 8px 14px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 0.95rem;
+  }
+
+  .menu-panel a:hover,
+  .menu-panel a:focus {
+    background: #1e4d6b;
+    outline: none;
+  }
+
+  h1 {
+    font-size: 1.35rem;
+    font-weight: 600;
+    margin: 0 0 8px;
+  }
+
+  h2 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 1.5rem 0 0.5rem;
+    color: var(--accent);
+  }
+
+  p, li {
+    color: var(--text);
+  }
+
+  .muted {
+    color: var(--muted);
+  }
+
+  .panel {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin: 1rem 0;
+  }
+
+  ul {
+    margin: 0.4rem 0 0;
+    padding-left: 1.25rem;
+  }
+
+  li {
+    margin-bottom: 0.45rem;
+  }
+
+  kbd {
+    background: #333;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: Consolas, monospace;
+    font-size: 0.9em;
+    color: var(--text);
+  }
+
+  a.back {
+    color: var(--accent);
+  }
+
+  a.back:focus {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+</style>
+</head>
+<body>
+  <nav class="app-menu" aria-label="Main menu">
+    <button
+      type="button"
+      class="menu-toggle"
+      id="menu-toggle"
+      aria-expanded="false"
+      aria-controls="menu-panel"
+      aria-haspopup="true">
+      Menu
+    </button>
+    <ul class="menu-panel" id="menu-panel" role="menu" data-open="false">
+      <li role="none">
+        <a role="menuitem" href="index.html">Terminal</a>
+      </li>
+      <li role="none">
+        <a role="menuitem" href="instructions.html" aria-current="page">Instructions</a>
+      </li>
+    </ul>
+  </nav>
+
+  <header>
+    <h1>Instructions</h1>
+    <p class="muted">How to use Accessible PowerShell with a screen reader or keyboard.</p>
+  </header>
+
+  <main>
+    <p>
+      <a class="back" href="index.html">← Back to terminal</a>
+    </p>
+
+    <section class="panel" aria-labelledby="overview-heading">
+      <h2 id="overview-heading">Overview</h2>
+      <p>
+        The interface has three clear regions:
+      </p>
+      <ul>
+        <li><strong>Current path</strong> — where you are in the filesystem</li>
+        <li><strong>Output</strong> — read-only history of commands and results</li>
+        <li><strong>Command</strong> — a text field to type PowerShell commands</li>
+      </ul>
+      <p>
+        There is no canvas terminal grid. Screen readers can tab between path, output,
+        and the command box like any other form.
+      </p>
+    </section>
+
+    <section class="panel" aria-labelledby="howto-heading">
+      <h2 id="howto-heading">How to use (screen reader)</h2>
+      <ol>
+        <li>When the page loads, wait for “Shell ready” / “Connected to PowerShell.”</li>
+        <li>Focus lands on the <strong>Command</strong> field.</li>
+        <li>Type a command (for example <code>Get-Date</code> or <code>Get-ChildItem</code>) and press <kbd>Enter</kbd>.</li>
+        <li>A short status is announced when the command finishes (succeeded or failed).</li>
+        <li>Press <kbd>Alt</kbd>+<kbd>O</kbd> (or “Go to output”) to read results in the output box with browse mode / the virtual cursor.</li>
+        <li>Press <kbd>Alt</kbd>+<kbd>C</kbd> to return to the command field.</li>
+      </ol>
+    </section>
+
+    <section class="panel" aria-labelledby="hints-heading">
+      <h2 id="hints-heading">Keyboard tips</h2>
+      <ul>
+        <li><kbd>Enter</kbd> runs the command</li>
+        <li><kbd>Tab</kbd> completes paths and commands (like PowerShell); <kbd>Shift</kbd>+<kbd>Tab</kbd> cycles backward</li>
+        <li><kbd>Up</kbd> / <kbd>Down</kbd> recall previous commands</li>
+        <li><kbd>Alt</kbd>+<kbd>O</kbd> moves focus to output</li>
+        <li><kbd>Alt</kbd>+<kbd>C</kbd> moves focus to the command field</li>
+        <li><kbd>Escape</kbd> clears the command field</li>
+      </ul>
+      <p class="muted">
+        Tab stays in the command field — it does not move focus to the Run button.
+        Completions use your current path so <code>cd per</code> + Tab can expand to a folder under that directory.
+      </p>
+    </section>
+
+    <section class="panel" aria-labelledby="path-heading">
+      <h2 id="path-heading">Current path across refreshes</h2>
+      <p>
+        The last working directory is saved in the browser. After you refresh the page,
+        the shell restores that path automatically when possible.
+      </p>
+    </section>
+  </main>
+
+<script>
+(function () {
+  const menuToggle = document.getElementById('menu-toggle');
+  const menuPanel = document.getElementById('menu-panel');
+
+  function setMenuOpen(open) {
+    menuToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    menuPanel.dataset.open = open ? 'true' : 'false';
+  }
+
+  menuToggle.addEventListener('click', function () {
+    const open = menuToggle.getAttribute('aria-expanded') !== 'true';
+    setMenuOpen(open);
+  });
+
+  document.addEventListener('click', function (event) {
+    if (!menuToggle.contains(event.target) && !menuPanel.contains(event.target)) {
+      setMenuOpen(false);
+    }
+  });
+
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') {
+      setMenuOpen(false);
+    }
+  });
+})();
+</script>
+</body>
+</html>

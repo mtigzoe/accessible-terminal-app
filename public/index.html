@@ -24,11 +24,77 @@
   body {
     margin: 0;
     padding: 24px;
+    padding-top: 64px;
     background: var(--panel);
     color: var(--text);
     font-family: "Segoe UI", system-ui, sans-serif;
     line-height: 1.4;
     max-width: 56rem;
+  }
+
+  /* Top-left menu */
+  .app-menu {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 100;
+  }
+
+  .menu-toggle {
+    background: #2a2a2a;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-family: inherit;
+  }
+
+  .menu-toggle:hover {
+    border-color: var(--accent);
+  }
+
+  .menu-toggle:focus {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .menu-toggle[aria-expanded="true"] {
+    border-color: var(--accent);
+  }
+
+  .menu-panel {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    min-width: 12rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 0;
+    list-style: none;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  }
+
+  .menu-panel[data-open="true"] {
+    display: block;
+  }
+
+  .menu-panel a {
+    display: block;
+    padding: 8px 14px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 0.95rem;
+  }
+
+  .menu-panel a:hover,
+  .menu-panel a:focus {
+    background: #1e4d6b;
+    outline: none;
   }
 
   h1 {
@@ -165,27 +231,6 @@
     cursor: not-allowed;
   }
 
-  .hints {
-    margin-top: 16px;
-    color: var(--muted);
-    font-size: 0.9rem;
-  }
-
-  .hints ul {
-    margin: 6px 0 0;
-    padding-left: 1.2rem;
-  }
-
-  .hints kbd {
-    background: #333;
-    border: 1px solid #555;
-    border-radius: 4px;
-    padding: 1px 6px;
-    font-family: Consolas, monospace;
-    font-size: 0.9em;
-    color: var(--text);
-  }
-
   .connection {
     font-size: 0.9rem;
     margin-bottom: 12px;
@@ -214,6 +259,23 @@
 </style>
 </head>
 <body>
+  <nav class="app-menu" aria-label="Main menu">
+    <button
+      type="button"
+      class="menu-toggle"
+      id="menu-toggle"
+      aria-expanded="false"
+      aria-controls="menu-panel"
+      aria-haspopup="true">
+      Menu
+    </button>
+    <ul class="menu-panel" id="menu-panel" role="menu" data-open="false">
+      <li role="none">
+        <a role="menuitem" href="instructions.html">Instructions</a>
+      </li>
+    </ul>
+  </nav>
+
   <header>
     <h1>Accessible PowerShell</h1>
     <p class="subtitle">
@@ -279,24 +341,39 @@
     </section>
   </main>
 
-  <aside class="hints" aria-labelledby="hints-heading">
-    <h2 id="hints-heading" class="visually-hidden">Keyboard tips</h2>
-    <ul>
-      <li><kbd>Enter</kbd> runs the command</li>
-      <li><kbd>Tab</kbd> completes paths and commands (like PowerShell); <kbd>Shift</kbd>+<kbd>Tab</kbd> cycles backward</li>
-      <li><kbd>Up</kbd> / <kbd>Down</kbd> recall previous commands</li>
-      <li><kbd>Alt</kbd>+<kbd>O</kbd> moves focus to output</li>
-      <li><kbd>Alt</kbd>+<kbd>C</kbd> moves focus to the command field</li>
-      <li><kbd>Escape</kbd> clears the command field</li>
-    </ul>
-  </aside>
-
   <!-- Short status only — not the full command output (that lives in #output). -->
   <div id="sr-status" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
   <div id="sr-alert" class="visually-hidden" role="alert" aria-live="assertive" aria-atomic="true"></div>
 
 <script>
 (function () {
+  // --- Menu ---
+  const menuToggle = document.getElementById('menu-toggle');
+  const menuPanel = document.getElementById('menu-panel');
+
+  function setMenuOpen(open) {
+    menuToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    menuPanel.dataset.open = open ? 'true' : 'false';
+  }
+
+  menuToggle.addEventListener('click', function () {
+    const open = menuToggle.getAttribute('aria-expanded') !== 'true';
+    setMenuOpen(open);
+  });
+
+  document.addEventListener('click', function (event) {
+    if (!menuToggle.contains(event.target) && !menuPanel.contains(event.target)) {
+      setMenuOpen(false);
+    }
+  });
+
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') {
+      setMenuOpen(false);
+    }
+  });
+
+  // --- Shell UI ---
   const pathEl = document.getElementById('path-value');
   const outputEl = document.getElementById('output');
   const commandEl = document.getElementById('command');
