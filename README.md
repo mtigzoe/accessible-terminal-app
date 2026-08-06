@@ -1,29 +1,23 @@
-# Accessible Terminal (starter app)
+# Accessible PowerShell
 
-A minimal browser-based terminal that connects to a real shell (PowerShell on
-Windows, `$SHELL`/bash elsewhere) via `node-pty`, and renders it with
-xterm.js in `screenReaderMode` so screen readers can navigate the output as
-real text — the same "Esc to leave the input, arrow through the output"
-pattern discussed in chat.
+A simple browser shell built for screen readers. Three clear regions:
 
-Backend is TypeScript (`src/server.ts`); frontend is plain JavaScript
-(`public/index.html`). xterm.js is installed as a normal npm dependency
-(`@xterm/xterm`) and served locally by the Express server at `/vendor/xterm`
-— no CDN, no build step needed for the frontend, just for the server.
+1. **Current path** — where you are in the filesystem  
+2. **Output** — read-only history of commands and results  
+3. **Command** — a normal text field to type PowerShell commands  
+
+No canvas terminal grid. Screen readers can tab between path, output, and the command box like any other form.
+
+Backend is TypeScript (`src/server.ts`); frontend is plain HTML/JS (`public/index.html`). Each browser connection gets a real PowerShell process via `node-pty` over a WebSocket.
 
 ## Requirements
 
 - Node.js 18 or later
-- Build tools for `node-pty` (it's a native module, compiled on install):
-  - **Windows**: Visual Studio Build Tools with the "Desktop development
-    with C++" workload, plus Python 3
+- Build tools for `node-pty` (native module):
+  - **Windows**: Visual Studio Build Tools with the "Desktop development with C++" workload, plus Python 3
   - **macOS**: Xcode Command Line Tools (`xcode-select --install`)
   - **Linux**: `build-essential` and `python3`
-
-If `npm install` fails specifically on `node-pty`, it's almost always one of
-the above missing — search for "node-pty windows build" or "node-pty EACCES"
-for current troubleshooting steps, since native build tooling issues vary
-by OS version.
+- On Windows, **PowerShell 7** (`pwsh`) on `PATH`
 
 ## Setup
 
@@ -32,65 +26,48 @@ npm install
 npm run dev
 ```
 
-Then open **http://localhost:3000**.
+Open **http://localhost:3000**.
 
-For a production-style run instead of `ts-node`:
+Production-style:
 
 ```bash
 npm run build
 npm start
 ```
 
-## What it does
+## How to use (screen reader)
 
-- Spawns a real shell per browser connection, with the working directory set
-  to your home folder — the same default a freshly opened PowerShell window
-  or terminal starts in.
-- Streams shell output to the browser over a WebSocket, and every keystroke
-  you type goes straight back to that shell process — so command history,
-  tab completion, `Ctrl+C`, etc. all behave exactly as they do in a normal
-  terminal, because it *is* a normal terminal underneath.
-- `screenReaderMode: true` on the xterm.js `Terminal` is the one line doing
-  the accessibility work: it keeps a hidden, linearized text buffer in sync
-  with the visual grid, which is what lets a screen reader's virtual cursor
-  read the scrollback after you press Esc to leave the input.
+1. When the page loads, wait for “Shell ready” / “Connected to PowerShell.”
+2. Focus lands on the **Command** field.
+3. Type a command (for example `Get-Date` or `Get-ChildItem`) and press **Enter**.
+4. A short status is announced when the command finishes (succeeded or failed).
+5. Press **Alt+O** (or “Go to output”) to read results in the output box with browse mode / the virtual cursor.
+6. Press **Alt+C** to return to the command field.
 
-## Testing with JAWS
+### Keyboard
 
-1. Tab or click into the terminal — JAWS should announce an edit field and
-   enter forms mode.
-2. Type a command and press Enter.
-3. Press **Esc** to leave forms mode and arrow through the output.
-4. Click back into the terminal (or press Enter) to resume typing.
+| Key | Action |
+|-----|--------|
+| Enter | Run command |
+| Tab | Complete paths/commands (PowerShell `TabExpansion2`) |
+| Shift+Tab | Previous completion match |
+| Up / Down | Command history |
+| Escape | Clear the command field |
+| Alt+O | Focus output |
+| Alt+C | Focus command field |
 
-## Accessible view + command navigation
+Tab stays in the command field — it does not move focus to the Run button. Completions use your **current path** so `cd per` + Tab can expand to a folder under that directory.
 
-Loosely modeled on VS Code's terminal accessibility features:
+## How it works
 
-- **Alt+F2**, from the terminal, opens a read-only "accessible view" — a
-  static snapshot of the buffer in a plain `<textarea>`, separate from the
-  live terminal grid. This tends to behave more predictably for screen
-  readers than navigating a constantly-updating live region.
-- Inside the accessible view: **Alt+Up** / **Alt+Down** jump between
-  command boundaries, announcing whether the previous command succeeded or
-  failed. **Escape** (or the Close button) returns to the terminal.
+- The server spawns `pwsh` (or `$SHELL` / bash on non-Windows) per WebSocket connection, starting in your home folder.
+- The page sends one full command line at a time when you press Enter.
+- Shell output is cleaned of ANSI escape codes and shown as plain text in the output box.
+- The current path is taken from the PowerShell prompt (`PS C:\…>`).
+- Optional shell integration (`shell-integration/pwsh-integration.ps1`) emits OSC 633 markers so the UI can announce success vs failure more reliably.
 
-Command navigation only works in PowerShell, and only because
-`shell-integration/pwsh-integration.ps1` overrides the PowerShell prompt
-function to emit invisible marker sequences (OSC 633, the same informal
-convention VS Code's shell integration uses) before each prompt. xterm.js's
-parser picks these up via `registerOscHandler` — they're never displayed.
-Without shell cooperation like this, there's no reliable way to know where
-one command ends and the next begins just by reading the character grid.
-
-This is a minimal implementation, not a full port of VS Code's shell
-integration — there's no bash/zsh equivalent yet (only PowerShell), and it
-won't survive things like nested prompts or custom `PS1`-style
-customization you might already have. If you use bash, the same idea can be
-adapted using `PROMPT_COMMAND`.
+Interactive full-screen programs (editors, pagers) are not the goal of this simple form UI — line-oriented PowerShell commands are.
 
 ## Security note
 
-This is a minimal example, not a production app: there's no authentication,
-and anyone who can reach the server gets a real shell on the host machine.
-Don't deploy this as-is anywhere reachable outside your own machine.
+There is no authentication. Anyone who can reach the server gets a real shell on the host. Keep it on localhost unless you add proper access control.
