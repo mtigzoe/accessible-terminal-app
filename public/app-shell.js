@@ -124,7 +124,6 @@
   let restoredPath = null;
   let pathRestoreAttempted = false;
 
-  // Captures output of the current command for structured interpretation.
   let commandOutputChunks = [];
 
   let completionRequestId = 0;
@@ -138,7 +137,17 @@
     index: 0
   };
 
-  const PROMPT_RE = /^PS\s+(.+?)(>+)\s*$/;
+  // PowerShell: PS C:\path>
+  // Bash/zsh:   user@host:~/path$   or   user@host:/path#
+  function matchPrompt(line) {
+    var ps = line.match(/^PS\s+(.+?)(>+)\s*$/);
+    if (ps) return ps[1];
+    var bash = line.match(/^[\w.-]+@[\w.-]+:([^\s$#]+)[$#]\s*$/);
+    if (bash) return bash[1];
+    var simple = line.match(/^([/~][^\s$#]*)\s*[$#]\s*$/);
+    if (simple) return simple[1];
+    return null;
+  }
 
   function announce(text) {
     srStatus.textContent = '';
@@ -177,7 +186,7 @@
     }
     const line = text == null ? '' : String(text);
     appendOutput(line + '\n');
-    socket.send(line + '\r');
+    socket.send(line + '\n');
   }
 
   function pathsEqual(a, b) {
@@ -251,8 +260,6 @@
     return chunk.replace(/\u001b\]633;[^\u0007]*\u0007/g, '');
   }
 
-  // --- Structured view -----------------------------------------------------
-
   function clearStructuredView() {
     if (!structuredPanel || !structuredContent) {
       return;
@@ -283,16 +290,6 @@
     );
   }
 
-  /**
-   * Rule-based interpreters for a few high-value commands.
-   * Returns a structured view object or null if the output is not recognized.
-   * Shape:
-   * {
-   *   title, summary,
-   *   items: [{ title, meta, current?, actions: [{ id, label, command, confirm? }] }],
-   *   globalActions: [{ id, label, command, confirm? }]
-   * }
-   */
   function interpretOutput(command, outputText) {
     if (isGitStatusCommand(command)) {
       return interpretGitStatus(outputText);
@@ -362,7 +359,6 @@
     }
 
     if (!branch && staged.length === 0 && unstaged.length === 0 && untracked.length === 0) {
-      // Not recognizable as git status output.
       return null;
     }
 
@@ -434,10 +430,6 @@
     const branches = [];
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      // Typical formats:
-      // * main
-      //   feature/login
-      // * main                abc1234 [origin/main] Latest commit message
       const m = line.match(/^([* ])\s+(\S+)(?:\s+(.*))?$/);
       if (!m) {
         continue;
@@ -628,8 +620,6 @@
     }
   }
 
-  // --- End structured view -------------------------------------------------
-
   function finishCommand() {
     if (!commandRunning) {
       return;
@@ -701,9 +691,9 @@
     const displayLines = [];
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      const promptMatch = line.match(PROMPT_RE);
-      if (promptMatch) {
-        onPromptSeen(promptMatch[1]);
+      const promptPath = matchPrompt(line);
+      if (promptPath) {
+        onPromptSeen(promptPath);
         continue;
       }
       if (commandRunning && pendingCommand && line.trim() === pendingCommand) {
@@ -714,9 +704,9 @@
         commandOutputChunks.push(line + '\n');
       }
     }
-    const tailPrompt = rawBuffer.match(PROMPT_RE);
-    if (tailPrompt) {
-      onPromptSeen(tailPrompt[1]);
+    const tailPath = matchPrompt(rawBuffer);
+    if (tailPath) {
+      onPromptSeen(tailPath);
       rawBuffer = '';
     }
     if (displayLines.length > 0) {
@@ -839,6 +829,99 @@
     applyCompletionMatch(0);
   }
 
+  function isNlshEnabled() {
+    try {
+      return localStorage.getItem('terminal-nlsh-enabled') === 'true';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function getSelectedOllamaModel() {
+    try {
+      return localStorage.getItem('terminal-ollama-model') || '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function isNaturalLanguage(text) {
+    if (!text || text.startsWith('!')) return false;
+    var shellCommands = {
+      ls: 1, pwd: 1, clear: 1, exit: 1, quit: 1, whoami: 1, date: 1, dir: 1, cls: 1, cd: 1,
+      history: 1, which: 1, man: 1, touch: 1, head: 1, tail: 1, grep: 1, find: 1
+    };
+    if (shellCommands[text]) return false;
+    var starters = [
+      'cd ', 'ls ', 'dir ', 'echo ', 'cat ', 'type ', 'mkdir ', 'rm ', 'del ', 'cp ', 'mv ',
+      'git ', 'npm ', 'node ', 'npx ', 'python', 'pip ', 'curl ', 'wget ', 'sudo ', 'docker ',
+      'kubectl ', 'Get-', 'Set-', 'New-', 'Remove-', './', '.\\', '/', '~', '$', '>', '|', '&&'
+    ];
+    for (var i = 0; i < starters.length; i++) {
+      if (text.indexOf(starters[i]) === 0) return false;
+    }
+    return true;
+  }
+
+  function translateNaturalLanguage(input) {
+    var model = getSelectedOllamaModel();
+    announce('Translating with Ollama' + (model ? ' (' + model + ')' : '') + '\u2026');
+    return fetch('/api/nlsh/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        input: input,
+        cwd: currentPath || undefined,
+        model: model || undefined
+      })
+    }).then(function (r) {
+      return r.json().then(function (body) {
+        if (!r.ok || !body.ok) {
+          throw new Error((body && body.error) || 'Translation failed.');
+        }
+        return body.command;
+      });
+    });
+  }
+
+  function submitCommandLine(rawText) {
+    var text = (rawText || '').trim();
+    if (!text) return;
+
+    if (isNlshEnabled() && isNaturalLanguage(text)) {
+      runBtn.disabled = true;
+      translateNaturalLanguage(text)
+        .then(function (command) {
+          runBtn.disabled = false;
+          if (!command) {
+            announce('Model returned an empty command.');
+            return;
+          }
+          var ok = window.confirm(
+            'Natural language shell proposes:\n\n' + command + '\n\nRun this command?'
+          );
+          if (!ok) {
+            announce('Cancelled.');
+            commandEl.focus();
+            return;
+          }
+          runCommand(command);
+        })
+        .catch(function (err) {
+          runBtn.disabled = false;
+          announce(
+            err && err.message
+              ? err.message
+              : 'Could not translate. Is Ollama running? Check Settings \u2192 model.'
+          );
+          commandEl.focus();
+        });
+      return;
+    }
+
+    runCommand(text);
+  }
+
   function runCommand(commandText) {
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       return;
@@ -857,7 +940,7 @@
     resetCompletion();
     clearStructuredView();
     commandOutputChunks = [];
-    const echo = (currentPath ? currentPath : 'PS') + '> ' + text + '\n';
+    const echo = (currentPath ? currentPath : '$') + '> ' + text + '\n';
     appendOutput(echo);
     pendingCommand = text;
     commandRunning = true;
@@ -868,7 +951,7 @@
     draftBeforeHistory = '';
     commandEl.value = '';
     announce('Running ' + text);
-    socket.send(text + '\r');
+    socket.send(text + '\n');
   }
 
   restorePath();
@@ -879,8 +962,21 @@
   socket.addEventListener('open', function () {
     if (restoredPath) {
       requestPathRestore(restoredPath);
+    } else {
+      socket.send(JSON.stringify({ type: 'cwd', cwd: '' }));
     }
-    announce('Connecting. Waiting for PowerShell prompt.');
+    announce('Connecting. Waiting for shell prompt.');
+    window.setTimeout(function () {
+      if (!ready && socket.readyState === WebSocket.OPEN) {
+        ready = true;
+        setControlsEnabled(true);
+        if (!currentPath) {
+          pathEl.textContent = '(shell ready)';
+        }
+        announce('Shell ready. Type a command.');
+        commandEl.focus();
+      }
+    }, 2500);
   });
 
   socket.addEventListener('message', function (event) {
@@ -900,7 +996,7 @@
 
   formEl.addEventListener('submit', function (event) {
     event.preventDefault();
-    runCommand(commandEl.value);
+    submitCommandLine(commandEl.value);
   });
 
   if (stopBtn) {
