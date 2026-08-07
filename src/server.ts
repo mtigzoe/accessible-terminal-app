@@ -260,6 +260,13 @@ async function fetchOllama(
       ...init,
       signal: controller.signal
     });
+  } catch (e) {
+    if (e instanceof Error && (e.name === 'AbortError' || /aborted/i.test(e.message))) {
+      throw new Error(
+        `Ollama request timed out after ${timeoutMs / 1000}s at ${OLLAMA_HOST}. The model may be slow to load or busy.`
+      );
+    }
+    throw e;
   } finally {
     clearTimeout(timer);
   }
@@ -315,10 +322,6 @@ function shellDescription(): string {
   return 'Linux / bash';
 }
 
-/**
- * Translate natural language to a single shell command via Ollama.
- * Used by the accessible web terminal when nlsh is enabled in settings.
- */
 app.post('/api/nlsh/translate', async (req, res) => {
   const input = typeof req.body?.input === 'string' ? req.body.input.trim() : '';
   const cwd =
@@ -362,7 +365,7 @@ User request: ${input}`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model, prompt, stream: false })
       },
-      90000
+      180000
     );
     if (!r.ok) {
       const body = await r.text().catch(() => '');
@@ -374,7 +377,6 @@ User request: ${input}`;
     }
     const data = (await r.json()) as { response?: string };
     let command = (data.response || '').trim();
-    // Strip accidental markdown fences / leading labels
     command = command
       .replace(/^```(?:bash|sh|powershell|pwsh)?\s*/i, '')
       .replace(/```$/i, '')
