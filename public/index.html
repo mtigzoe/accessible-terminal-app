@@ -71,6 +71,51 @@
   button:disabled { opacity: 0.55; cursor: not-allowed; }
   .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
+  /* nlsh progress */
+  #nlsh-progress[hidden] { display: none; }
+  #nlsh-progress {
+    margin-top: 12px;
+  }
+  #nlsh-progress-text {
+    margin: 0 0 8px;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+  #nlsh-progress-bar {
+    width: 100%;
+    height: 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: #222;
+    overflow: hidden;
+    appearance: none;
+  }
+  #nlsh-progress-bar:not([value]) {
+    background:
+      linear-gradient(
+        90deg,
+        #222 0%,
+        var(--accent) 40%,
+        #222 80%
+      );
+    background-size: 200% 100%;
+    animation: nlsh-indeterminate 1.2s linear infinite;
+  }
+  @keyframes nlsh-indeterminate {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+  }
+  html[data-high-contrast="true"] #nlsh-progress-bar:not([value]) {
+    background:
+      linear-gradient(
+        90deg,
+        #000 0%,
+        #ffff00 40%,
+        #000 80%
+      );
+    background-size: 200% 100%;
+  }
+
   /* Structured results panel */
   #structured-panel[hidden] { display: none; }
   #structured-content { margin: 0; }
@@ -158,6 +203,16 @@
           <button type="button" id="clear-btn" disabled>Clear output</button>
         </div>
       </form>
+      <div
+        id="nlsh-progress"
+        hidden
+        role="status"
+        aria-live="polite"
+        aria-busy="false"
+        aria-labelledby="nlsh-progress-text">
+        <p id="nlsh-progress-text"></p>
+        <progress id="nlsh-progress-bar" aria-label="Translation progress"></progress>
+      </div>
     </section>
   </main>
   <div id="sr-status" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
