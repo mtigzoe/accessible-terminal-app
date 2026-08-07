@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Settings — Accessible PowerShell</title>
+<title>Settings — Accessible terminal</title>
 <script>
 (function () {
   try {
@@ -136,6 +136,12 @@
     color: var(--accent);
   }
 
+  h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem;
+  }
+
   .muted { color: var(--muted); }
   .ok { color: var(--ok); }
   .err { color: var(--error); }
@@ -245,10 +251,6 @@
     margin: 0.5rem 0 0;
     font-size: 0.95rem;
   }
-
-  #model-section[data-disabled="true"] {
-    opacity: 0.65;
-  }
 </style>
 </head>
 <body>
@@ -277,7 +279,7 @@
 
   <header>
     <h1>Settings</h1>
-    <p class="muted">Display preferences are saved in this browser and apply to all pages.</p>
+    <p class="muted">Preferences are saved in this browser. See Instructions for Ollama setup on Windows or Linux.</p>
   </header>
 
   <main>
@@ -302,7 +304,7 @@
           </div>
         </fieldset>
         <p class="muted" style="margin: 0.75rem 0 0; font-size: 0.95rem;">
-          Accessible mode is best with screen readers. Full console is a real terminal grid for interactive programs.
+          Accessible mode is best with screen readers and natural language. Full console is a real terminal grid.
           After changing mode, open the Terminal page (or refresh it).
         </p>
       </section>
@@ -316,17 +318,20 @@
           </label>
         </div>
         <p class="muted" style="margin: 0.75rem 0 0; font-size: 0.95rem;">
-          When enabled, everyday language in the command box can be translated to a shell command via local Ollama
-          (after confirmation). Requires Ollama running on port 11434. The standalone CLI (<code>npm run nlsh</code>)
-          is separate and always uses Ollama when available.
+          When enabled, everyday language in the Accessible command box is translated via Ollama
+          (after confirmation). Requires Ollama reachable from the machine running the server.
+          Details and setup commands are on the <a href="instructions.html">Instructions</a> page.
         </p>
 
         <div id="model-section" style="margin-top: 1rem;">
-          <h3 style="font-size: 1rem; margin: 0 0 0.5rem;">Model selection</h3>
+          <h3 id="model-heading">Model selection</h3>
+          <p class="muted" style="margin: 0 0 0.5rem; font-size: 0.95rem;">
+            Choose which Ollama model to use for translation. The list is loaded from the server’s Ollama connection.
+          </p>
           <div class="setting-row">
             <label for="ollama-model" class="option" style="flex-direction: column; align-items: flex-start; gap: 0.35rem;">
               <span>Ollama model</span>
-              <select id="ollama-model" name="ollama-model" aria-describedby="ollama-status">
+              <select id="ollama-model" name="ollama-model" aria-describedby="ollama-status model-heading">
                 <option value="">Loading models…</option>
               </select>
             </label>
@@ -476,7 +481,6 @@
   const modeRadios = document.querySelectorAll('input[name="console-mode"]');
   const nlshEnabledEl = document.getElementById('nlsh-enabled');
   const modelSelect = document.getElementById('ollama-model');
-  const modelSection = document.getElementById('model-section');
   const ollamaStatus = document.getElementById('ollama-status');
   const refreshModelsBtn = document.getElementById('refresh-models');
   const srStatus = document.getElementById('sr-status');
@@ -502,13 +506,6 @@
       localStorage.setItem('terminal-font-size', fontSize);
     } catch (e) {}
     applyToDocument(highContrast, fontSize);
-  }
-
-  function updateModelSectionState() {
-    const enabled = nlshEnabledEl.checked;
-    modelSection.dataset.disabled = enabled ? 'false' : 'true';
-    modelSelect.disabled = !enabled;
-    refreshModelsBtn.disabled = !enabled;
   }
 
   function loadSettings() {
@@ -539,7 +536,6 @@
     });
     nlshEnabledEl.checked = nlsh;
     modelSelect.dataset.preferred = model;
-    updateModelSectionState();
     applyToDocument(hc, fs);
   }
 
@@ -600,16 +596,17 @@
             body.models.length +
             ' model' +
             (body.models.length === 1 ? '' : 's') +
-            ' available.';
+            ' available. Choose one from the list.';
           announce('Loaded ' + body.models.length + ' Ollama models.');
         } else {
           populateModels([], preferred);
           ollamaStatus.className = 'err';
           ollamaStatus.textContent =
             'Could not list models. ' +
-            (body.error || 'Is Ollama running on port 11434?') +
+            (body.error || 'Is Ollama running?') +
             ' Host: ' +
-            (body.host || 'http://127.0.0.1:11434');
+            (body.host || 'http://127.0.0.1:11434') +
+            '. See Instructions for setup.';
           announce('Could not load Ollama models.');
         }
       })
@@ -667,10 +664,9 @@
         nlshEnabledEl.checked ? 'true' : 'false'
       );
     } catch (e) {}
-    updateModelSectionState();
     announce(
       nlshEnabledEl.checked
-        ? 'Natural language shell enabled.'
+        ? 'Natural language shell enabled. Select a model if needed.'
         : 'Natural language shell disabled.'
     );
   });

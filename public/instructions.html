@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Instructions — Accessible PowerShell</title>
+<title>Instructions — Accessible terminal</title>
 <script>
 (function () {
   try {
@@ -22,7 +22,7 @@
   html[data-font-size="large"] { font-size: 18px; }
   html[data-font-size="x-large"] { font-size: 22px; }
   * { box-sizing: border-box; }
-  body { margin: 0; padding: 24px; padding-top: 64px; background: var(--panel); color: var(--text); font-family: "Segoe UI", system-ui, sans-serif; line-height: 1.5; max-width: 40rem; }
+  body { margin: 0; padding: 24px; padding-top: 64px; background: var(--panel); color: var(--text); font-family: "Segoe UI", system-ui, sans-serif; line-height: 1.5; max-width: 42rem; }
   .app-menu { position: fixed; top: 12px; left: 12px; z-index: 100; }
   .menu-toggle { background: #2a2a2a; color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 8px 14px; cursor: pointer; font-size: 0.95rem; font-family: inherit; }
   .menu-toggle:focus { outline: 2px solid var(--focus); outline-offset: 2px; }
@@ -32,12 +32,27 @@
   .menu-panel a:hover, .menu-panel a:focus { background: #1e4d6b; outline: none; }
   h1 { font-size: 1.35rem; font-weight: 600; margin: 0 0 8px; }
   h2 { font-size: 1.05rem; font-weight: 600; margin: 1.5rem 0 0.5rem; color: var(--accent); }
+  h3 { font-size: 1rem; font-weight: 600; margin: 1rem 0 0.4rem; }
   .muted { color: var(--muted); }
   .panel { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; margin: 1rem 0; }
   ul, ol { margin: 0.4rem 0 0; padding-left: 1.25rem; }
   li { margin-bottom: 0.45rem; }
   kbd { background: #333; border: 1px solid #555; border-radius: 4px; padding: 1px 6px; font-family: Consolas, monospace; font-size: 0.9em; }
-  a.back { color: var(--accent); }
+  code, pre { font-family: Consolas, "Courier New", monospace; font-size: 0.92em; }
+  code { background: #222; border: 1px solid #444; border-radius: 3px; padding: 1px 5px; }
+  html[data-high-contrast="true"] code { background: #000; border-color: #fff; }
+  pre {
+    background: #111;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 12px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0.5rem 0 0;
+  }
+  html[data-high-contrast="true"] pre { background: #000; }
+  a.back, a { color: var(--accent); }
 </style>
 </head>
 <body>
@@ -51,28 +66,32 @@
     </ul>
   </nav>
   <header>
-    <h1>Accessible PowerShell</h1>
-    <p class="muted">Simple screen-reader friendly shell: current path, output history, and a command box.</p>
+    <h1>Instructions</h1>
+    <p class="muted">Screen-reader friendly shell, optional natural-language commands via Ollama, and how to run on Windows or Linux.</p>
   </header>
   <main>
     <p><a class="back" href="index.html">← Back to terminal</a></p>
+
     <section class="panel" aria-labelledby="modes-heading">
       <h2 id="modes-heading">Console modes</h2>
       <p>Under <strong>Settings → Console mode</strong>, or the menu:</p>
       <ul>
-        <li><strong>Accessible</strong> (default) — path, output, and command field. Best for screen readers.</li>
-        <li><strong>Full console</strong> — real terminal grid (xterm.js) for vim and interactive programs. Open <a href="console.html">Full console</a>.</li>
+        <li><strong>Accessible</strong> (default) — path, output, and command field. Best for screen readers. Supports natural language when nlsh is enabled.</li>
+        <li><strong>Full console</strong> — real terminal grid (xterm.js) for vim and interactive programs. Open <a href="console.html">Full console</a>. Natural language is not applied here.</li>
       </ul>
     </section>
+
     <section class="panel" aria-labelledby="overview-heading">
-      <h2 id="overview-heading">Overview</h2>
+      <h2 id="overview-heading">Accessible terminal overview</h2>
       <p>The accessible terminal page has three regions:</p>
       <ul>
         <li><strong>Current path</strong> — where you are in the filesystem</li>
         <li><strong>Output</strong> — read-only history of commands and results</li>
-        <li><strong>Command</strong> — a text field to type PowerShell commands</li>
+        <li><strong>Command</strong> — a text field to type shell commands (or natural language if enabled)</li>
       </ul>
+      <p>On Windows the shell is PowerShell. On Linux/macOS it is your default shell (usually bash or zsh).</p>
     </section>
+
     <section class="panel" aria-labelledby="hints-heading">
       <h2 id="hints-heading">Keyboard tips (accessible mode)</h2>
       <ul>
@@ -81,6 +100,87 @@
         <li><kbd>Tab</kbd> completes paths and commands</li>
         <li><kbd>Alt</kbd>+<kbd>F2</kbd> or <kbd>Alt</kbd>+<kbd>O</kbd> focuses output</li>
         <li><kbd>Alt</kbd>+<kbd>C</kbd> focuses the command field</li>
+      </ul>
+    </section>
+
+    <section class="panel" aria-labelledby="nlsh-heading">
+      <h2 id="nlsh-heading">Natural language shell (nlsh) and Ollama</h2>
+      <p>
+        When enabled, you can type everyday language in the <strong>Accessible</strong> command box
+        (for example, “Where am I in this path”). The app asks local Ollama for a shell command,
+        shows a confirmation dialog, then runs the command if you accept.
+      </p>
+      <h3>Settings: enable and choose a model</h3>
+      <ol>
+        <li>Open <a href="settings.html">Settings</a>.</li>
+        <li>Under <strong>Natural language shell (nlsh / Ollama)</strong>, check
+          <strong>Enable natural language commands in the web terminal</strong>.</li>
+        <li>Under <strong>Model selection</strong>, open the <strong>Ollama model</strong> list and choose a model
+          (for example <code>llama3.2</code>). Use <strong>Refresh model list</strong> if you just installed a model.</li>
+        <li>Return to the <a href="index.html">Accessible terminal</a> and type natural language or normal shell commands.</li>
+      </ol>
+      <p class="muted">
+        The selected model is stored in this browser. The standalone CLI
+        (<code>npm run nlsh</code>) is separate and uses its own model via <code>.env</code> or <code>!model</code>.
+      </p>
+      <h3>Ports</h3>
+      <ul>
+        <li><strong>Web app</strong> — port <code>3000</code> (open <code>http://localhost:3000</code>)</li>
+        <li><strong>Ollama</strong> — port <code>11434</code> (the Node server talks to Ollama; the browser does not)</li>
+      </ul>
+      <p>These ports do not conflict. You can run both at the same time.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="setup-heading">
+      <h2 id="setup-heading">Where to run the app and Ollama</h2>
+      <p>
+        The shell runs on the same machine as <code>npm run dev</code>.
+        Ollama can be on the same machine or another host. Configure with the
+        <code>OLLAMA_HOST</code> environment variable (default <code>http://127.0.0.1:11434</code>).
+      </p>
+
+      <h3>Option 1 — Everything on Windows (no Linux)</h3>
+      <ol>
+        <li>Install <a href="https://ollama.com">Ollama for Windows</a> and pull a model:</li>
+      </ol>
+      <pre>ollama pull llama3.2</pre>
+      <ol start="2">
+        <li>In the project folder, start the app (defaults are fine):</li>
+      </ol>
+      <pre>npm run dev</pre>
+      <p>Open <code>http://localhost:3000</code>. In Settings, enable nlsh and select your model.</p>
+
+      <h3>Option 2 — Everything on Linux</h3>
+      <pre>ollama pull llama3.2
+npm run dev</pre>
+      <p>Open <code>http://localhost:3000</code> (or use VS Code Remote-SSH port forward and open
+      <code>http://localhost:3000</code> on Windows).</p>
+
+      <h3>Option 3 — App on Windows, Ollama on Linux</h3>
+      <p>On <strong>Linux</strong>, let Ollama accept network connections (if needed):</p>
+      <pre>export OLLAMA_HOST=0.0.0.0:11434
+ollama serve</pre>
+      <p>On <strong>Windows</strong>, point the app at the Linux machine (replace the IP):</p>
+      <pre>$env:OLLAMA_HOST = "http://192.168.1.50:11434"
+npm run dev</pre>
+      <p>Or keep Ollama on Linux localhost and tunnel port 11434 with SSH:</p>
+      <pre>ssh -L 11434:127.0.0.1:11434 user@linux-host</pre>
+      <p>Then on Windows use the default (no <code>OLLAMA_HOST</code> needed) and run <code>npm run dev</code>.</p>
+
+      <h3>Standalone natural-language CLI</h3>
+      <p>Optional command-line tool (same Ollama models):</p>
+      <pre>npm run nlsh</pre>
+      <p>Use <code>!model</code> to pick a model, <code>!help</code> for commands, <code>exit</code> to quit.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="troubleshoot-heading">
+      <h2 id="troubleshoot-heading">Troubleshooting</h2>
+      <ul>
+        <li><strong>Port 3000 already in use</strong> — stop the old server (<code>fuser -k 3000/tcp</code> on Linux, or end the Node process in Task Manager on Windows), or run
+          <code>PORT=3001 npm run dev</code>.</li>
+        <li><strong>Settings cannot list models</strong> — ensure Ollama is running and reachable from the machine that runs Node; click <strong>Refresh model list</strong>.</li>
+        <li><strong>Natural language does nothing</strong> — use the Accessible terminal (not Full console), enable nlsh in Settings, and select a model.</li>
+        <li><strong>Stuck on “Waiting for shell prompt”</strong> — on Linux the UI should detect bash prompts or enable after a few seconds; refresh the page after updating the app.</li>
       </ul>
     </section>
   </main>
