@@ -9,37 +9,25 @@ import { WebSocket, WebSocketServer, RawData } from 'ws';
 const pty = require('node-pty');
 
 const app = express();
-app.use(express.json({ limit: '64kb' }));
+app.use(express.json({ limit: '256kb' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 
-// On Windows, use PowerShell 7 (pwsh.exe). It is resolved from PATH.
-// On Linux/macOS, use the user's default shell.
-const shell = process.platform === 'win32'
+const isWindows = process.platform === 'win32';
+
+const shell = isWindows
   ? 'pwsh.exe'
   : process.env.SHELL || 'bash';
 
 const defaultCwd = os.homedir();
 
-// On Windows, load the shell-integration script so the browser can detect
-// command success/failure via OSC 633 markers.
 const shellIntegrationScript = path.join(__dirname, '..', 'shell-integration', 'pwsh-integration.ps1');
 
-/**
- * Ollama runs on the same machine as this server (Linux host when using
- * VS Code Remote-SSH). Browser never talks to Ollama directly — only this
- * Node process does — so loopback is correct on every platform.
- */
 const OLLAMA_HOST = (process.env.OLLAMA_HOST || 'http://127.0.0.1:11434').replace(/\/$/, '');
+const DEFAULT_OLLAMA_MODEL = process.env.OLLAMA_MODEL || '';
 
-/**
- * HTTP bind address.
- * - Default 0.0.0.0: accept IPv4 on all interfaces so VS Code Remote-SSH
- *   port forwarding (Windows browser → localhost:3000 → Linux :3000) works.
- * - Override with HOST=127.0.0.1 to restrict to local-only if desired.
- */
 const HOST = process.env.HOST || '0.0.0.0';
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 
@@ -67,10 +55,6 @@ function resolveCwd(candidate: unknown): string {
   return defaultCwd;
 }
 
-/**
- * Tab completion via PowerShell's TabExpansion2, run in a short-lived process
- * at the client's current path — does not touch the interactive PTY session.
- */
 function getPowerShellCompletions(
   line: string,
   cursor: number,
@@ -167,7 +151,6 @@ try {
   });
 }
 
-/** Very small path-segment completion for non-Windows shells. */
 function getBasicPathCompletions(
   line: string,
   cursor: number,
@@ -234,7 +217,7 @@ async function runComplete(
   cwd: string
 ): Promise<Omit<CompleteResult, 'type' | 'id'>> {
   try {
-    if (process.platform === 'win32') {
+    if (isWindows) {
       return await getPowerShellCompletions(line, cursor, cwd);
     }
     return getBasicPathCompletions(line, cursor, cwd);
@@ -255,23 +238,28 @@ app.post('/api/complete', async (req, res) => {
   const id = typeof req.body?.id === 'number' ? req.body.id : null;
 
   const result = await runComplete(line, cursor, cwd);
-  const payload: CompleteResult = {
+  res.json({
     type: 'completeResult',
     id,
     replacementIndex: result.replacementIndex,
     replacementLength: result.replacementLength,
     matches: result.matches,
     error: result.error
-  };
-  res.json(payload);
+  });
 });
 
-/** Proxy helpers so the browser can talk to Ollama without CORS issues. */
-async function fetchOllama(apiPath: string, timeoutMs = 5000): Promise<Response> {
+async function fetchOllama(
+  apiPath: string,
+  init?: RequestInit,
+  timeoutMs = 5000
+): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(`${OLLAMA_HOST}${apiPath}`, { signal: controller.signal });
+    return await fetch(`${OLLAMA_HOST}${apiPath}`, {
+      ...init,
+      signal: controller.signal
+    });
   } finally {
     clearTimeout(timer);
   }
@@ -281,11 +269,7 @@ app.get('/api/ollama/status', async (_req, res) => {
   try {
     const r = await fetchOllama('/api/tags');
     if (!r.ok) {
-      res.json({
-        ok: false,
-        host: OLLAMA_HOST,
-        error: `Ollama returned HTTP ${r.status}`
-      });
+      res.json({ ok: false, host: OLLAMA_HOST, error: `Ollama returned HTTP ${r.status}` });
       return;
     }
     const data = (await r.json()) as { models?: Array<{ name?: string }> };
@@ -325,16 +309,100 @@ app.get('/api/ollama/models', async (_req, res) => {
   }
 });
 
+function shellDescription(): string {
+  if (isWindows) return 'Windows PowerShell (pwsh)';
+  if (process.platform === 'darwin') return 'macOS / zsh or bash';
+  return 'Linux / bash';
+}
+
+/**
+ * Translate natural language to a single shell command via Ollama.
+ * Used by the accessible web terminal when nlsh is enabled in settings.
+ */
+app.post('/api/nlsh/translate', async (req, res) => {
+  const input = typeof req.body?.input === 'string' ? req.body.input.trim() : '';
+  const cwd =
+    typeof req.body?.cwd === 'string' && req.body.cwd.trim()
+      ? req.body.cwd.trim()
+      : defaultCwd;
+  const model =
+    (typeof req.body?.model === 'string' && req.body.model.trim()) ||
+    DEFAULT_OLLAMA_MODEL;
+
+  if (!input) {
+    res.status(400).json({ ok: false, error: 'Missing input.' });
+    return;
+  }
+  if (!model) {
+    res.status(400).json({
+      ok: false,
+      error: 'No Ollama model selected. Choose one in Settings.'
+    });
+    return;
+  }
+
+  const prompt = `You are a shell command translator. Convert the user's request into a single shell command for ${shellDescription()}.
+
+Current directory: ${cwd}
+
+Rules:
+- Output ONLY the command, nothing else
+- No explanations, no markdown, no backticks
+- If unclear, make a reasonable assumption
+- Prefer simple, common commands
+${isWindows ? '- Prefer PowerShell cmdlets when appropriate (Get-ChildItem, Set-Location, Get-Location, etc.)' : '- Prefer standard POSIX tools (pwd, ls, cd, etc.)'}
+
+User request: ${input}`;
+
+  try {
+    const r = await fetchOllama(
+      '/api/generate',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, prompt, stream: false })
+      },
+      90000
+    );
+    if (!r.ok) {
+      const body = await r.text().catch(() => '');
+      res.status(502).json({
+        ok: false,
+        error: `Ollama HTTP ${r.status}: ${body.slice(0, 200)}`
+      });
+      return;
+    }
+    const data = (await r.json()) as { response?: string };
+    let command = (data.response || '').trim();
+    // Strip accidental markdown fences / leading labels
+    command = command
+      .replace(/^```(?:bash|sh|powershell|pwsh)?\s*/i, '')
+      .replace(/```$/i, '')
+      .replace(/^(?:command|cmd)\s*[:=]\s*/i, '')
+      .trim()
+      .split('\n')[0]
+      .trim();
+
+    if (!command) {
+      res.json({ ok: false, error: 'Model returned an empty command.' });
+      return;
+    }
+    res.json({ ok: true, command, model });
+  } catch (e) {
+    res.status(503).json({
+      ok: false,
+      error:
+        e instanceof Error
+          ? e.message
+          : 'Could not reach Ollama. Is it running on port 11434?'
+    });
+  }
+});
+
 function rawDataToString(raw: RawData): string {
-  if (typeof raw === 'string') {
-    return raw;
-  }
-  if (Buffer.isBuffer(raw)) {
-    return raw.toString('utf8');
-  }
-  if (Array.isArray(raw)) {
-    return Buffer.concat(raw).toString('utf8');
-  }
+  if (typeof raw === 'string') return raw;
+  if (Buffer.isBuffer(raw)) return raw.toString('utf8');
+  if (Array.isArray(raw)) return Buffer.concat(raw).toString('utf8');
   return Buffer.from(raw).toString('utf8');
 }
 
@@ -342,11 +410,15 @@ function psSingleQuoted(value: string): string {
   return "'" + value.replace(/'/g, "''") + "'";
 }
 
+function shSingleQuoted(value: string): string {
+  return "'" + value.replace(/'/g, "'\\''") + "'";
+}
+
 wss.on('connection', (ws: WebSocket) => {
   let ptyProcess: any = null;
 
   function buildShellArgs(cwd: string): string[] {
-    if (process.platform !== 'win32') {
+    if (!isWindows) {
       return [];
     }
     return [
@@ -385,15 +457,15 @@ wss.on('connection', (ws: WebSocket) => {
   }
 
   function forceSetLocation(target: string) {
-    if (!ptyProcess) {
-      return;
-    }
+    if (!ptyProcess) return;
     const resolved = resolveCwd(target);
-    const cmd =
-      'Set-Location -LiteralPath ' +
-      psSingleQuoted(resolved) +
-      '\r';
-    ptyProcess.write(cmd);
+    if (isWindows) {
+      ptyProcess.write(
+        'Set-Location -LiteralPath ' + psSingleQuoted(resolved) + '\r'
+      );
+    } else {
+      ptyProcess.write('cd ' + shSingleQuoted(resolved) + '\n');
+    }
   }
 
   ws.on('message', (raw: RawData) => {
@@ -415,9 +487,7 @@ wss.on('connection', (ws: WebSocket) => {
             typeof parsed.cols === 'number' &&
             typeof parsed.rows === 'number'
           ) {
-            if (ptyProcess) {
-              ptyProcess.resize(parsed.cols, parsed.rows);
-            }
+            if (ptyProcess) ptyProcess.resize(parsed.cols, parsed.rows);
             return;
           }
 
@@ -430,11 +500,8 @@ wss.on('connection', (ws: WebSocket) => {
                   : '';
 
             if (target) {
-              if (!ptyProcess) {
-                spawnPty(target);
-              } else {
-                forceSetLocation(target);
-              }
+              if (!ptyProcess) spawnPty(target);
+              else forceSetLocation(target);
             } else if (!ptyProcess) {
               spawnPty(defaultCwd);
             }
@@ -444,7 +511,7 @@ wss.on('connection', (ws: WebSocket) => {
           return;
         }
       } catch {
-        // Not valid JSON — treat as shell text below.
+        // Not valid JSON
       }
     }
 
@@ -456,18 +523,14 @@ wss.on('connection', (ws: WebSocket) => {
   });
 
   ws.on('close', () => {
-    if (ptyProcess) {
-      ptyProcess.kill();
-    }
+    if (ptyProcess) ptyProcess.kill();
   });
 });
 
 server.listen(PORT, HOST, () => {
-  // Always show localhost in the banner — that is what you open in the browser
-  // (including Windows via VS Code Remote-SSH port forward).
   console.log(`Accessible terminal running at http://localhost:${PORT}`);
   console.log(`Bind: ${HOST}:${PORT}  platform: ${process.platform}`);
   console.log(`Shell: ${shell}   Working directory: ${defaultCwd}`);
   console.log(`Ollama proxy (server-side): ${OLLAMA_HOST}`);
-  console.log(`  GET /api/ollama/status   GET /api/ollama/models`);
+  console.log(`  GET /api/ollama/models  POST /api/nlsh/translate`);
 });
