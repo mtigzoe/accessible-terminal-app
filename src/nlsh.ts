@@ -31,6 +31,14 @@ interface HistoryEntry {
 
 const commandHistory: HistoryEntry[] = [];
 
+/** Shell binary for child_process.exec (must be a string for TypeScript). */
+function defaultShell(): string {
+  if (process.platform === 'win32') {
+    return process.env.ComSpec || 'powershell.exe';
+  }
+  return process.env.SHELL || '/bin/sh';
+}
+
 // ---------------------------------------------------------------------------
 // Env / config
 // ---------------------------------------------------------------------------
@@ -372,7 +380,8 @@ async function runShell(cmd: string): Promise<{ stdout: string; stderr: string }
   try {
     const { stdout, stderr } = await execAsync(cmd, {
       cwd: process.cwd(),
-      shell: process.platform === 'win32' ? 'powershell.exe' : true,
+      // @types/node types shell as string | undefined (not boolean).
+      shell: defaultShell(),
       maxBuffer: 4 * 1024 * 1024,
       env: process.env
     });
