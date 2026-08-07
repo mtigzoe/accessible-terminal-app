@@ -15,10 +15,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as readline from 'readline';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
+import { spawn } from 'child_process';
 
 const ENV_PATH = path.join(process.cwd(), '.env');
 const MAX_HISTORY = 10;
@@ -31,17 +28,13 @@ interface HistoryEntry {
 
 const commandHistory: HistoryEntry[] = [];
 
-/** Shell binary for child_process.exec (must be a string for TypeScript). */
+/** Shell binary for child_process (must be a string for TypeScript). */
 function defaultShell(): string {
   if (process.platform === 'win32') {
     return process.env.ComSpec || 'powershell.exe';
   }
   return process.env.SHELL || '/bin/sh';
 }
-
-// ---------------------------------------------------------------------------
-// Env / config
-// ---------------------------------------------------------------------------
 
 function loadEnv(): void {
   if (!fs.existsSync(ENV_PATH)) {
@@ -66,10 +59,6 @@ function saveConfig(model: string, host: string): void {
   const body = `OLLAMA_MODEL=${model}\nOLLAMA_HOST=${host}\n`;
   fs.writeFileSync(ENV_PATH, body, 'utf8');
 }
-
-// ---------------------------------------------------------------------------
-// Ollama HTTP
-// ---------------------------------------------------------------------------
 
 async function ollamaRequest(
   apiPath: string,
@@ -114,21 +103,12 @@ async function listModels(): Promise<string[]> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Readline helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Readline completer: Tab expands file names and built-ins.
- * Matches are relative to process.cwd().
- */
 function completer(line: string): [string[], string] {
   const m = line.match(/(?:^|[\s;|&])([^\s;|&]*)$/);
   const token = m ? m[1] : line;
 
   const hits: string[] = [];
 
-  // Built-ins for start of line
   const builtins = ['!model', '!help', '!cmd ', 'exit', 'quit', 'cd ', 'ls', 'pwd'];
   if (!line.includes(' ') || line.startsWith(token)) {
     for (const b of builtins) {
@@ -142,7 +122,6 @@ function completer(line: string): [string[], string] {
     }
   }
 
-  // Path completion on last token
   let prefix = token;
   let dir = process.cwd();
   try {
@@ -194,10 +173,6 @@ function question(rl: readline.Interface, prompt: string): Promise<string> {
     rl.question(prompt, (answer) => resolve((answer || '').trim()));
   });
 }
-
-// ---------------------------------------------------------------------------
-// Model setup
-// ---------------------------------------------------------------------------
 
 async function setupModel(rl: readline.Interface): Promise<void> {
   const host = process.env.OLLAMA_HOST || 'http://localhost:11434';
@@ -252,12 +227,11 @@ function showHelp(): void {
   console.log();
   console.log('Type natural language for AI translation, or a real shell command to run it as-is.');
   console.log('Press \x1b[36mTab\x1b[0m to complete file and folder names in the current directory.');
+  console.log(
+    'Interactive programs (e.g. python3 script.py) use the real terminal — type answers at their prompts.'
+  );
   console.log();
 }
-
-// ---------------------------------------------------------------------------
-// History
-// ---------------------------------------------------------------------------
 
 function getContextSize(): number {
   return commandHistory.reduce(
@@ -296,10 +270,6 @@ function formatHistory(): string {
   });
   return lines.join('\n');
 }
-
-// ---------------------------------------------------------------------------
-// NL → command via Ollama
-// ---------------------------------------------------------------------------
 
 function shellDescription(): string {
   if (process.platform === 'win32') {
@@ -355,7 +325,6 @@ User request: ${userInput}`;
   )) as { response?: string };
 
   let command = (data.response || '').trim();
-  // Strip accidental markdown fences if the model ignores instructions
   command = command
     .replace(/^```(?:bash|sh|shell|powershell|pwsh)?\s*/i, '')
     .replace(/\n?```$/i, '')
@@ -369,87 +338,18 @@ function isNaturalLanguage(text: string): boolean {
   }
 
   const shellCommands = new Set([
-    'ls',
-    'pwd',
-    'clear',
-    'exit',
-    'quit',
-    'whoami',
-    'date',
-    'cal',
-    'top',
-    'htop',
-    'history',
-    'which',
-    'man',
-    'touch',
-    'head',
-    'tail',
-    'grep',
-    'find',
-    'sort',
-    'wc',
-    'diff',
-    'tar',
-    'zip',
-    'unzip',
-    'dir',
-    'cls',
-    'cd'
+    'ls', 'pwd', 'clear', 'exit', 'quit', 'whoami', 'date', 'cal', 'top', 'htop',
+    'history', 'which', 'man', 'touch', 'head', 'tail', 'grep', 'find', 'sort',
+    'wc', 'diff', 'tar', 'zip', 'unzip', 'dir', 'cls', 'cd'
   ]);
 
   const shellStarters = [
-    'cd ',
-    'ls ',
-    'dir ',
-    'echo ',
-    'cat ',
-    'type ',
-    'mkdir ',
-    'md ',
-    'rm ',
-    'del ',
-    'cp ',
-    'copy ',
-    'mv ',
-    'move ',
-    'git ',
-    'npm ',
-    'node ',
-    'npx ',
-    'python',
-    'pip ',
-    'brew ',
-    'curl ',
-    'wget ',
-    'chmod ',
-    'chown ',
-    'sudo ',
-    'vi ',
-    'vim ',
-    'nano ',
-    'code ',
-    'open ',
-    'export ',
-    'source ',
-    'docker ',
-    'kubectl ',
-    'aws ',
-    'gcloud ',
-    'Get-',
-    'Set-',
-    'New-',
-    'Remove-',
-    'Write-',
-    './',
-    '.\\',
-    '/',
-    '~',
-    '$',
-    '>',
-    '>>',
-    '|',
-    '&&'
+    'cd ', 'ls ', 'dir ', 'echo ', 'cat ', 'type ', 'mkdir ', 'md ', 'rm ', 'del ',
+    'cp ', 'copy ', 'mv ', 'move ', 'git ', 'npm ', 'node ', 'npx ', 'python',
+    'pip ', 'brew ', 'curl ', 'wget ', 'chmod ', 'chown ', 'sudo ', 'vi ', 'vim ',
+    'nano ', 'code ', 'open ', 'export ', 'source ', 'docker ', 'kubectl ', 'aws ',
+    'gcloud ', 'Get-', 'Set-', 'New-', 'Remove-', 'Write-', './', '.\\', '/', '~',
+    '$', '>', '>>', '|', '&&'
   ];
 
   if (shellCommands.has(text)) {
@@ -458,27 +358,43 @@ function isNaturalLanguage(text: string): boolean {
   return !shellStarters.some((s) => text.startsWith(s));
 }
 
-// ---------------------------------------------------------------------------
-// Shell execution
-// ---------------------------------------------------------------------------
+/**
+ * Run a shell command with the real terminal attached (stdin/stdout/stderr).
+ * Needed so interactive programs (python input(), read, etc.) show prompts
+ * and can accept keyboard input.
+ */
+function runShell(
+  cmd: string,
+  rl?: readline.Interface
+): Promise<{ code: number | null }> {
+  return new Promise((resolve) => {
+    if (rl) {
+      rl.pause();
+    }
 
-async function runShell(cmd: string): Promise<{ stdout: string; stderr: string }> {
-  try {
-    const { stdout, stderr } = await execAsync(cmd, {
+    const child = spawn(cmd, {
       cwd: process.cwd(),
-      // @types/node types shell as string | undefined (not boolean).
       shell: defaultShell(),
-      maxBuffer: 4 * 1024 * 1024,
-      env: process.env
+      env: process.env,
+      stdio: 'inherit'
     });
-    return { stdout: stdout || '', stderr: stderr || '' };
-  } catch (err: unknown) {
-    const e = err as { stdout?: string; stderr?: string; message?: string };
-    return {
-      stdout: e.stdout || '',
-      stderr: e.stderr || e.message || String(err)
+
+    const finish = (code: number | null) => {
+      if (rl) {
+        rl.resume();
+      }
+      resolve({ code });
     };
-  }
+
+    child.on('error', (err) => {
+      console.error(err.message);
+      finish(1);
+    });
+
+    child.on('close', (code) => {
+      finish(code);
+    });
+  });
 }
 
 function tryChdir(target: string): void {
@@ -493,20 +409,15 @@ function tryChdir(target: string): void {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Main loop
-// ---------------------------------------------------------------------------
-
 async function main(): Promise<void> {
   loadEnv();
   process.env.OLLAMA_HOST = process.env.OLLAMA_HOST || 'http://localhost:11434';
 
   const rl = createRl();
 
-  // Graceful Ctrl+C: cancel current prompt, stay in loop.
   rl.on('SIGINT', () => {
     process.stdout.write('\n');
-    rl.write(null, { ctrl: true, name: 'u' }); // clear line
+    rl.write(null, { ctrl: true, name: 'u' });
   });
 
   const firstRun = !process.env.OLLAMA_MODEL;
@@ -535,7 +446,6 @@ async function main(): Promise<void> {
         process.exit(0);
       }
 
-      // Built-in cd (affects this process, not a subprocess).
       if (userInput === 'cd') {
         process.chdir(os.homedir());
         continue;
@@ -555,40 +465,28 @@ async function main(): Promise<void> {
         continue;
       }
 
-      // !cmd or bare ! — run shell command directly (skip NL translation).
       if (userInput.startsWith('!')) {
         const cmd = userInput.slice(1).trim();
         if (!cmd) {
           continue;
         }
-        // Support "!cmd <command>" style from the Python help text.
         const direct = cmd.toLowerCase().startsWith('cmd ')
           ? cmd.slice(4).trim()
           : cmd;
         if (!direct) {
           continue;
         }
-        const result = await runShell(direct);
-        process.stdout.write(result.stdout);
-        if (result.stderr) {
-          process.stderr.write(result.stderr);
-        }
-        addToHistory(direct, result.stdout + result.stderr);
+        await runShell(direct, rl);
+        addToHistory(direct, '(interactive / live output)');
         continue;
       }
 
-      // Looks like a real shell command — run as-is.
       if (!isNaturalLanguage(userInput)) {
-        const result = await runShell(userInput);
-        process.stdout.write(result.stdout);
-        if (result.stderr) {
-          process.stderr.write(result.stderr);
-        }
-        addToHistory(userInput, result.stdout + result.stderr);
+        await runShell(userInput, rl);
+        addToHistory(userInput, '(interactive / live output)');
         continue;
       }
 
-      // Natural language → Ollama → confirm → run.
       const command = await getCommand(userInput, cwd);
       if (!command) {
         console.log('\x1b[31mModel returned an empty command.\x1b[0m');
@@ -597,7 +495,6 @@ async function main(): Promise<void> {
 
       const confirm = await question(rl, `\x1b[33m→ ${command}\x1b[0m [Enter] `);
       if (confirm !== '') {
-        // Any non-empty reply cancels (same as the Python script).
         continue;
       }
 
@@ -611,12 +508,8 @@ async function main(): Promise<void> {
         continue;
       }
 
-      const result = await runShell(command);
-      process.stdout.write(result.stdout);
-      if (result.stderr) {
-        process.stderr.write(result.stderr);
-      }
-      addToHistory(command, result.stdout + result.stderr);
+      await runShell(command, rl);
+      addToHistory(command, '(interactive / live output)');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       if (/aborted|AbortError/i.test(msg)) {
