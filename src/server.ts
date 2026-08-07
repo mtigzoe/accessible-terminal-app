@@ -27,7 +27,21 @@ const defaultCwd = os.homedir();
 // command success/failure via OSC 633 markers.
 const shellIntegrationScript = path.join(__dirname, '..', 'shell-integration', 'pwsh-integration.ps1');
 
+/**
+ * Ollama runs on the same machine as this server (Linux host when using
+ * VS Code Remote-SSH). Browser never talks to Ollama directly — only this
+ * Node process does — so loopback is correct on every platform.
+ */
 const OLLAMA_HOST = (process.env.OLLAMA_HOST || 'http://127.0.0.1:11434').replace(/\/$/, '');
+
+/**
+ * HTTP bind address.
+ * - Default 0.0.0.0: accept IPv4 on all interfaces so VS Code Remote-SSH
+ *   port forwarding (Windows browser → localhost:3000 → Linux :3000) works.
+ * - Override with HOST=127.0.0.1 to restrict to local-only if desired.
+ */
+const HOST = process.env.HOST || '0.0.0.0';
+const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 
 interface CompleteResult {
   type: 'completeResult';
@@ -65,7 +79,6 @@ function getPowerShellCompletions(
   const safeCursor = Math.max(0, Math.min(cursor, line.length));
   const lineB64 = Buffer.from(line, 'utf8').toString('base64');
 
-  // Line is base64 so user text cannot break out of the script string.
   const script = `
 $ErrorActionPreference = 'Stop'
 $line = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${lineB64}'))
@@ -235,10 +248,6 @@ async function runComplete(
   }
 }
 
-/**
- * Tab completion is HTTP — never the shell WebSocket — so a complete request
- * cannot be mistaken for keystrokes and pasted into PowerShell.
- */
 app.post('/api/complete', async (req, res) => {
   const line = typeof req.body?.line === 'string' ? req.body.line : '';
   const cursor = typeof req.body?.cursor === 'number' ? req.body.cursor : line.length;
@@ -329,7 +338,6 @@ function rawDataToString(raw: RawData): string {
   return Buffer.from(raw).toString('utf8');
 }
 
-/** Escape a path for use inside a single-quoted PowerShell string. */
 function psSingleQuoted(value: string): string {
   return "'" + value.replace(/'/g, "''") + "'";
 }
@@ -454,10 +462,12 @@ wss.on('connection', (ws: WebSocket) => {
   });
 });
 
-const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
-
-server.listen(PORT, () => {
+server.listen(PORT, HOST, () => {
+  // Always show localhost in the banner — that is what you open in the browser
+  // (including Windows via VS Code Remote-SSH port forward).
   console.log(`Accessible terminal running at http://localhost:${PORT}`);
+  console.log(`Bind: ${HOST}:${PORT}  platform: ${process.platform}`);
   console.log(`Shell: ${shell}   Working directory: ${defaultCwd}`);
-  console.log(`Ollama proxy: ${OLLAMA_HOST}  (GET /api/ollama/status, /api/ollama/models)`);
+  console.log(`Ollama proxy (server-side): ${OLLAMA_HOST}`);
+  console.log(`  GET /api/ollama/status   GET /api/ollama/models`);
 });
