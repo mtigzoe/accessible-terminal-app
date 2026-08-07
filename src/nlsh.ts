@@ -180,10 +180,14 @@ async function setupModel(rl: readline.Interface): Promise<void> {
 }
 
 function showHelp(): void {
-  console.log('\x1b[36m!model\x1b[0m - Change Ollama model');
-  console.log('\x1b[36m!help\x1b[0m - Show this help');
-  console.log('\x1b[36m!cmd <command>\x1b[0m - Run a shell command directly');
-  console.log('\x1b[36mexit\x1b[0m / \x1b[36mquit\x1b[0m - Leave nlsh');
+  console.log('\x1b[1mCommands\x1b[0m');
+  console.log('\x1b[36m!model\x1b[0m          Change Ollama model');
+  console.log('\x1b[36m!help\x1b[0m           Show this help');
+  console.log('\x1b[36m!cmd <command>\x1b[0m  Run a shell command directly (skip AI)');
+  console.log('\x1b[36m!<command>\x1b[0m      Same as !cmd — e.g. \x1b[36m!ls\x1b[0m, \x1b[36m!pwd\x1b[0m, \x1b[36m!git status\x1b[0m');
+  console.log('\x1b[36mexit\x1b[0m / \x1b[36mquit\x1b[0m     Leave nlsh');
+  console.log();
+  console.log('Type natural language for AI translation, or a real shell command to run it as-is.');
   console.log();
 }
 
@@ -426,9 +430,13 @@ async function main(): Promise<void> {
   const firstRun = !process.env.OLLAMA_MODEL;
   if (firstRun) {
     await setupModel(rl);
-    console.log('\x1b[1mnlsh\x1b[0m - talk to your terminal\n');
-    showHelp();
   }
+
+  const model = process.env.OLLAMA_MODEL || '(none — type !model)';
+  const host = process.env.OLLAMA_HOST || 'http://localhost:11434';
+  console.log('\x1b[1mnlsh\x1b[0m — natural-language shell');
+  console.log(`Ollama: ${host}  model: \x1b[32m${model}\x1b[0m\n`);
+  showHelp();
 
   for (;;) {
     try {
