@@ -77,7 +77,7 @@
       <p>Under <strong>Settings → Console mode</strong>, or the menu:</p>
       <ul>
         <li><strong>Accessible</strong> (default) — path, output, and command field. Best for screen readers. Supports natural language when nlsh is enabled.</li>
-        <li><strong>Full console</strong> — real terminal grid (xterm.js) for vim and interactive programs. Open <a href="console.html">Full console</a>. Natural language is not applied here.</li>
+        <li><strong>Full console</strong> — real terminal grid (xterm.js) for vim and interactive programs. Open <a href="console.html">Full console</a>. Natural language is not applied here. Use the <strong>accessible buffer</strong> (below) to read output more reliably with a screen reader.</li>
       </ul>
     </section>
 
@@ -101,6 +101,39 @@
         <li><kbd>Alt</kbd>+<kbd>F2</kbd> or <kbd>Alt</kbd>+<kbd>O</kbd> focuses output</li>
         <li><kbd>Alt</kbd>+<kbd>C</kbd> focuses the command field</li>
       </ul>
+    </section>
+
+    <section class="panel" aria-labelledby="full-console-heading">
+      <h2 id="full-console-heading">Full console and accessible buffer</h2>
+      <p>
+        The <a href="console.html">Full console</a> is a real terminal (xterm.js) with
+        <code>screenReaderMode</code> enabled. That helps, but a character grid is still harder
+        for screen readers than a normal text field—especially after long output or in
+        programs like vim.
+      </p>
+      <p>
+        Use the <strong>accessible buffer</strong> when you want a stable, read-only snapshot of
+        the terminal as plain text (similar in spirit to VS Code’s accessible terminal view).
+      </p>
+      <h3>Open the accessible buffer</h3>
+      <ul>
+        <li><kbd>Alt</kbd>+<kbd>F2</kbd> — open (or refresh if already open)</li>
+        <li>Or click <strong>Accessible buffer (Alt+F2)</strong> in the toolbar</li>
+      </ul>
+      <p>
+        The dialog shows a read-only text area with the current scrollback. Focus moves there so
+        you can use browse mode or the virtual cursor like any other document.
+      </p>
+      <h3>While the buffer is open</h3>
+      <ul>
+        <li><kbd>Escape</kbd> or <strong>Close</strong> — return to the full console and restore focus to xterm</li>
+        <li><strong>Refresh snapshot</strong> or <kbd>Alt</kbd>+<kbd>F2</kbd> again — update the text from the live terminal</li>
+        <li><kbd>Alt</kbd>+<kbd>Up</kbd> / <kbd>Alt</kbd>+<kbd>Down</kbd> — move by line and announce the line number and contents</li>
+      </ul>
+      <p class="muted">
+        Prefer the <a href="index.html">Accessible terminal</a> for everyday commands and natural language.
+        Use Full console when you need a true TTY (vim, interactive tools), then Alt+F2 to read the result.
+      </p>
     </section>
 
     <section class="panel" aria-labelledby="nlsh-heading">
@@ -171,6 +204,10 @@ npm run dev</pre>
       <p>Optional command-line tool (same Ollama models):</p>
       <pre>npm run nlsh</pre>
       <p>Use <code>!model</code> to pick a model, <code>!help</code> for commands, <code>exit</code> to quit.</p>
+      <p>You can also start the CLI from another directory:</p>
+      <pre># Linux / macOS — adjust the path to your clone
+npx --prefix ~/ai_shell/accessible-terminal-app ts-node \
+  ~/ai_shell/accessible-terminal-app/src/nlsh.ts</pre>
     </section>
 
     <section class="panel" aria-labelledby="troubleshoot-heading">
@@ -181,6 +218,7 @@ npm run dev</pre>
         <li><strong>Settings cannot list models</strong> — ensure Ollama is running and reachable from the machine that runs Node; click <strong>Refresh model list</strong>.</li>
         <li><strong>Natural language does nothing</strong> — use the Accessible terminal (not Full console), enable nlsh in Settings, and select a model.</li>
         <li><strong>Stuck on “Waiting for shell prompt”</strong> — on Linux the UI should detect bash prompts or enable after a few seconds; refresh the page after updating the app.</li>
+        <li><strong>Full console is hard to read with a screen reader</strong> — press <kbd>Alt</kbd>+<kbd>F2</kbd> for the accessible buffer, or switch to the Accessible terminal for line-oriented work.</li>
       </ul>
     </section>
   </main>
