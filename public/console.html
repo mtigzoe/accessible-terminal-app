@@ -8,22 +8,158 @@
 <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js"></script>
 <style>
-  :root { --bg: #0c0c0c; --panel: #161616; --text: #e6e6e6; --muted: #a0a0a0; --accent: #4fc1e9; --border: #333; --focus: #4fc1e9; }
+  :root {
+    --bg: #0c0c0c;
+    --panel: #161616;
+    --text: #e6e6e6;
+    --muted: #a0a0a0;
+    --accent: #4fc1e9;
+    --border: #333;
+    --focus: #4fc1e9;
+  }
   * { box-sizing: border-box; }
-  body { margin: 0; padding: 12px; padding-top: 56px; background: var(--panel); color: var(--text); font-family: "Segoe UI", system-ui, sans-serif; height: 100vh; }
+  body {
+    margin: 0;
+    padding: 12px;
+    padding-top: 56px;
+    background: var(--panel);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, sans-serif;
+    height: 100vh;
+  }
   .app-menu { position: fixed; top: 12px; left: 12px; z-index: 100; }
-  .menu-toggle { background: #2a2a2a; color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 8px 14px; cursor: pointer; font-size: 0.95rem; font-family: inherit; }
+  .menu-toggle {
+    background: #2a2a2a;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-family: inherit;
+  }
   .menu-toggle:focus { outline: 2px solid var(--focus); outline-offset: 2px; }
-  .menu-panel { display: none; position: absolute; top: 100%; left: 0; margin: 4px 0 0; min-width: 12rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 0; list-style: none; box-shadow: 0 6px 20px rgba(0,0,0,0.45); }
+  .menu-panel {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin: 4px 0 0;
+    min-width: 12rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 0;
+    list-style: none;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.45);
+  }
   .menu-panel[data-open="true"] { display: block; }
-  .menu-panel a { display: block; padding: 8px 14px; color: var(--text); text-decoration: none; }
-  .menu-panel a:hover, .menu-panel a:focus { background: #1e4d6b; outline: none; }
-  .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 8px; }
-  .toolbar p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  .menu-panel a {
+    display: block;
+    padding: 8px 14px;
+    color: var(--text);
+    text-decoration: none;
+  }
+  .menu-panel a:hover,
+  .menu-panel a:focus { background: #1e4d6b; outline: none; }
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .toolbar p { margin: 0; color: var(--muted); font-size: 0.9rem; flex: 1 1 16rem; }
   .toolbar a { color: var(--accent); }
-  #xterm-wrap { height: calc(100vh - 100px); background: #000; border: 1px solid var(--border); border-radius: 6px; padding: 4px; }
+  .toolbar button {
+    background: #2a2a2a;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-family: inherit;
+  }
+  .toolbar button:focus { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .toolbar button.primary {
+    background: #1e4d6b;
+    border-color: #2a6a90;
+  }
+  #xterm-wrap {
+    height: calc(100vh - 100px);
+    background: #000;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px;
+  }
   #xterm-wrap .xterm { height: 100%; padding: 4px; }
-  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+  }
+
+  /* Accessible buffer (Alt+F2) */
+  #accessible-buffer[hidden] { display: none; }
+  #accessible-buffer {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(0, 0, 0, 0.72);
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    padding: 24px 16px;
+  }
+  #accessible-buffer .panel {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    width: min(56rem, 100%);
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  }
+  #accessible-buffer h1 {
+    margin: 0 0 8px;
+    font-size: 1.15rem;
+  }
+  #accessible-buffer .hint {
+    margin: 0 0 12px;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  #accessible-buffer-text {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 12rem;
+    resize: vertical;
+    background: #000;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 0.95rem;
+    line-height: 1.4;
+    padding: 10px;
+    white-space: pre;
+    overflow: auto;
+  }
+  #accessible-buffer-text:focus {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  #accessible-buffer .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+  }
 </style>
 </head>
 <body>
@@ -36,13 +172,51 @@
       <li role="none"><a role="menuitem" href="settings.html" tabindex="-1">Settings</a></li>
     </ul>
   </nav>
+
   <div class="toolbar">
-    <p>Full console (xterm). Every key goes to the shell. Prefer Accessible terminal with a screen reader.</p>
+    <p>
+      Full console (xterm). Prefer Accessible terminal with a screen reader.
+      Press <kbd>Alt</kbd>+<kbd>F2</kbd> for a read-only text snapshot of the buffer.
+    </p>
+    <button type="button" class="primary" id="open-accessible-buffer" aria-keyshortcuts="Alt+F2">
+      Accessible buffer (Alt+F2)
+    </button>
     <a href="settings.html">Settings</a>
     <a href="index.html" data-go-accessible>Accessible terminal</a>
   </div>
-  <div id="xterm-wrap" role="region" aria-label="Full terminal console"><div id="terminal"></div></div>
-  <div id="sr-status" class="visually-hidden" role="status" aria-live="polite"></div>
+
+  <div id="xterm-wrap" role="region" aria-label="Full terminal console">
+    <div id="terminal"></div>
+  </div>
+
+  <div
+    id="accessible-buffer"
+    hidden
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="accessible-buffer-title"
+    aria-describedby="accessible-buffer-hint">
+    <div class="panel">
+      <h1 id="accessible-buffer-title">Accessible buffer</h1>
+      <p id="accessible-buffer-hint" class="hint">
+        Read-only snapshot of the terminal. Use browse mode or arrow keys to read.
+        Alt+Up / Alt+Down move by line. Escape or Close returns to the console.
+      </p>
+      <label for="accessible-buffer-text" class="visually-hidden">Terminal buffer text</label>
+      <textarea
+        id="accessible-buffer-text"
+        readonly
+        spellcheck="false"
+        aria-label="Terminal buffer, read-only"></textarea>
+      <div class="actions">
+        <button type="button" id="close-accessible-buffer">Close (Escape)</button>
+        <button type="button" id="refresh-accessible-buffer">Refresh snapshot</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="sr-status" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
+
 <script>
 (function () {
   document.querySelectorAll('[data-go-accessible]').forEach(function (a) {
@@ -63,14 +237,24 @@
   }
   menuToggle.addEventListener('click', function () { setMenuOpen(!isMenuOpen(), 0); });
   menuToggle.addEventListener('keydown', function (e) {
-    if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMenuOpen(true, 0); }
+    if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setMenuOpen(true, 0);
+    }
   });
   menuPanel.addEventListener('keydown', function (e) {
     if (!isMenuOpen()) return;
     const idx = menuItems.indexOf(document.activeElement);
-    if (e.key === 'ArrowDown') { e.preventDefault(); menuItems[(idx + 1) % menuItems.length].focus(); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); menuItems[(idx - 1 + menuItems.length) % menuItems.length].focus(); }
-    else if (e.key === 'Escape') { e.preventDefault(); setMenuOpen(false); }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      menuItems[(idx + 1) % menuItems.length].focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      menuItems[(idx - 1 + menuItems.length) % menuItems.length].focus();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setMenuOpen(false);
+    }
   });
   document.addEventListener('click', function (e) {
     if (!menuToggle.contains(e.target) && !menuPanel.contains(e.target) && isMenuOpen()) {
@@ -80,7 +264,10 @@
   });
 
   const sr = document.getElementById('sr-status');
-  function announce(t) { sr.textContent = ''; setTimeout(function () { sr.textContent = t; }, 80); }
+  function announce(t) {
+    sr.textContent = '';
+    setTimeout(function () { sr.textContent = t; }, 80);
+  }
 
   if (typeof Terminal === 'undefined') {
     announce('Could not load xterm.js. Check your network or use Accessible terminal.');
@@ -93,13 +280,16 @@
     fontSize: 14,
     theme: { background: '#000000', foreground: '#e6e6e6', cursor: '#e6e6e6' },
     screenReaderMode: true,
-    convertEol: true
+    convertEol: true,
+    scrollback: 5000
   });
   var FitCtor = (typeof FitAddon !== 'undefined') ? (FitAddon.FitAddon || FitAddon) : null;
   const fitAddon = FitCtor ? new FitCtor() : null;
   if (fitAddon) term.loadAddon(fitAddon);
   term.open(document.getElementById('terminal'));
-  if (fitAddon) { try { fitAddon.fit(); } catch (e) {} }
+  if (fitAddon) {
+    try { fitAddon.fit(); } catch (e) {}
+  }
 
   const protocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
   const socket = new WebSocket(protocol + location.host + '/ws');
@@ -113,10 +303,12 @@
   socket.addEventListener('open', function () {
     try {
       var saved = localStorage.getItem('terminal-last-path');
-      if (saved && saved.trim()) socket.send(JSON.stringify({ type: 'cwd', cwd: saved.trim() }));
+      if (saved && saved.trim()) {
+        socket.send(JSON.stringify({ type: 'cwd', cwd: saved.trim() }));
+      }
     } catch (e) {}
     sendResize();
-    announce('Full console connected.');
+    announce('Full console connected. Alt+F2 opens the accessible buffer.');
     term.focus();
   });
   socket.addEventListener('message', function (ev) {
@@ -131,6 +323,143 @@
   });
   window.addEventListener('resize', sendResize);
   try { localStorage.setItem('terminal-console-mode', 'full'); } catch (e) {}
+
+  // ---------------------------------------------------------------------------
+  // Accessible buffer (Alt+F2) — VS Code–style read-only snapshot
+  // ---------------------------------------------------------------------------
+  const bufferOverlay = document.getElementById('accessible-buffer');
+  const bufferText = document.getElementById('accessible-buffer-text');
+  const openBufferBtn = document.getElementById('open-accessible-buffer');
+  const closeBufferBtn = document.getElementById('close-accessible-buffer');
+  const refreshBufferBtn = document.getElementById('refresh-accessible-buffer');
+
+  function isBufferOpen() {
+    return !bufferOverlay.hidden;
+  }
+
+  function captureBufferText() {
+    const buffer = term.buffer.active;
+    const lines = [];
+    for (let i = 0; i < buffer.length; i++) {
+      const line = buffer.getLine(i);
+      if (!line) {
+        lines.push('');
+        continue;
+      }
+      // true = trim right whitespace for cleaner reading
+      lines.push(line.translateToString(true));
+    }
+    // Drop trailing blank lines
+    while (lines.length && lines[lines.length - 1] === '') {
+      lines.pop();
+    }
+    return lines.join('\n');
+  }
+
+  function openAccessibleBuffer(refreshOnly) {
+    const text = captureBufferText();
+    bufferText.value = text || '(Buffer is empty.)';
+    if (!refreshOnly) {
+      bufferOverlay.hidden = false;
+      bufferText.focus();
+      try {
+        bufferText.setSelectionRange(0, 0);
+      } catch (e) {}
+      const lineCount = text ? text.split('\n').length : 0;
+      announce(
+        'Accessible buffer open. ' +
+          lineCount +
+          ' line' +
+          (lineCount === 1 ? '' : 's') +
+          '. Escape to return to the console.'
+      );
+    } else {
+      announce('Accessible buffer refreshed.');
+      bufferText.focus();
+    }
+  }
+
+  function closeAccessibleBuffer() {
+    if (!isBufferOpen()) return;
+    bufferOverlay.hidden = true;
+    term.focus();
+    announce('Returned to full console.');
+  }
+
+  function moveBufferLine(direction) {
+    if (!isBufferOpen()) return;
+    const value = bufferText.value;
+    const lines = value.split('\n');
+    if (!lines.length) return;
+
+    let pos = bufferText.selectionStart || 0;
+    // Find current line index
+    let lineStart = 0;
+    let lineIndex = 0;
+    for (let i = 0; i < lines.length; i++) {
+      const lineEnd = lineStart + lines[i].length;
+      if (pos <= lineEnd || i === lines.length - 1) {
+        lineIndex = i;
+        break;
+      }
+      lineStart = lineEnd + 1; // +1 for newline
+    }
+
+    let next = lineIndex + direction;
+    if (next < 0) next = 0;
+    if (next >= lines.length) next = lines.length - 1;
+
+    // Compute caret offset at start of target line
+    let offset = 0;
+    for (let i = 0; i < next; i++) {
+      offset += lines[i].length + 1;
+    }
+    const lineLen = lines[next].length;
+    bufferText.focus();
+    try {
+      bufferText.setSelectionRange(offset, offset + lineLen);
+    } catch (e) {}
+    const label = lines[next] || '(empty line)';
+    announce('Line ' + (next + 1) + ' of ' + lines.length + '. ' + label);
+  }
+
+  openBufferBtn.addEventListener('click', function () {
+    openAccessibleBuffer(false);
+  });
+  closeBufferBtn.addEventListener('click', function () {
+    closeAccessibleBuffer();
+  });
+  refreshBufferBtn.addEventListener('click', function () {
+    openAccessibleBuffer(true);
+  });
+
+  document.addEventListener('keydown', function (e) {
+    // Alt+F2 — open / refresh accessible buffer
+    if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === 'F2' || e.code === 'F2')) {
+      e.preventDefault();
+      if (isBufferOpen()) openAccessibleBuffer(true);
+      else openAccessibleBuffer(false);
+      return;
+    }
+
+    if (!isBufferOpen()) return;
+
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeAccessibleBuffer();
+      return;
+    }
+
+    if (e.altKey && !e.ctrlKey && !e.metaKey) {
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        moveBufferLine(-1);
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        moveBufferLine(1);
+      }
+    }
+  });
 })();
 </script>
 </body>
