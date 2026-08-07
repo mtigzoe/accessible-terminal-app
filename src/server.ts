@@ -27,13 +27,7 @@ const defaultCwd = os.homedir();
 // command success/failure via OSC 633 markers.
 const shellIntegrationScript = path.join(__dirname, '..', 'shell-integration', 'pwsh-integration.ps1');
 
-interface CompleteRequest {
-  type: 'complete';
-  id?: number;
-  line?: string;
-  cursor?: number;
-  cwd?: string;
-}
+const OLLAMA_HOST = (process.env.OLLAMA_HOST || 'http://127.0.0.1:11434').replace(/\/$/, '');
 
 interface CompleteResult {
   type: 'completeResult';
@@ -120,7 +114,6 @@ try {
         }
 
         const text = (stdout || '').trim();
-        // TabExpansion2 / ConvertTo-Json may emit a bare string or an object.
         try {
           const parsed = JSON.parse(text);
           if (Array.isArray(parsed)) {
@@ -132,7 +125,6 @@ try {
             return;
           }
           if (parsed && typeof parsed === 'object') {
-            // ConvertTo-Json turns a single-element array into a bare string.
             let matches: string[] = [];
             if (Array.isArray(parsed.matches)) {
               matches = parsed.matches.map(String);
@@ -265,6 +257,65 @@ app.post('/api/complete', async (req, res) => {
   res.json(payload);
 });
 
+/** Proxy helpers so the browser can talk to Ollama without CORS issues. */
+async function fetchOllama(apiPath: string, timeoutMs = 5000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(`${OLLAMA_HOST}${apiPath}`, { signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+app.get('/api/ollama/status', async (_req, res) => {
+  try {
+    const r = await fetchOllama('/api/tags');
+    if (!r.ok) {
+      res.json({
+        ok: false,
+        host: OLLAMA_HOST,
+        error: `Ollama returned HTTP ${r.status}`
+      });
+      return;
+    }
+    const data = (await r.json()) as { models?: Array<{ name?: string }> };
+    const models = (data.models || []).map((m) => m.name || '').filter(Boolean);
+    res.json({ ok: true, host: OLLAMA_HOST, modelCount: models.length, models });
+  } catch (e) {
+    res.json({
+      ok: false,
+      host: OLLAMA_HOST,
+      error: e instanceof Error ? e.message : String(e)
+    });
+  }
+});
+
+app.get('/api/ollama/models', async (_req, res) => {
+  try {
+    const r = await fetchOllama('/api/tags');
+    if (!r.ok) {
+      res.status(502).json({
+        ok: false,
+        host: OLLAMA_HOST,
+        models: [],
+        error: `Ollama returned HTTP ${r.status}`
+      });
+      return;
+    }
+    const data = (await r.json()) as { models?: Array<{ name?: string }> };
+    const models = (data.models || []).map((m) => m.name || '').filter(Boolean);
+    res.json({ ok: true, host: OLLAMA_HOST, models });
+  } catch (e) {
+    res.status(503).json({
+      ok: false,
+      host: OLLAMA_HOST,
+      models: [],
+      error: e instanceof Error ? e.message : String(e)
+    });
+  }
+});
+
 function rawDataToString(raw: RawData): string {
   if (typeof raw === 'string') {
     return raw;
@@ -290,8 +341,6 @@ wss.on('connection', (ws: WebSocket) => {
     if (process.platform !== 'win32') {
       return [];
     }
-    // -WorkingDirectory is more reliable than process cwd alone when
-    // starting with -File (PowerShell's location can ignore process cwd).
     return [
       '-NoLogo',
       '-NoExit',
@@ -332,7 +381,6 @@ wss.on('connection', (ws: WebSocket) => {
       return;
     }
     const resolved = resolveCwd(target);
-    // LiteralPath avoids wildcard expansion; silent if already there.
     const cmd =
       'Set-Location -LiteralPath ' +
       psSingleQuoted(resolved) +
@@ -366,7 +414,6 @@ wss.on('connection', (ws: WebSocket) => {
           }
 
           if (parsed.type === 'cwd') {
-            // Accept either "cwd" or legacy "path" property name.
             const target =
               typeof parsed.cwd === 'string'
                 ? parsed.cwd
@@ -378,7 +425,6 @@ wss.on('connection', (ws: WebSocket) => {
               if (!ptyProcess) {
                 spawnPty(target);
               } else {
-                // Session already running — change directory in-place.
                 forceSetLocation(target);
               }
             } else if (!ptyProcess) {
@@ -387,7 +433,6 @@ wss.on('connection', (ws: WebSocket) => {
             return;
           }
 
-          // Ignore unknown control types (including legacy "complete" over WS).
           return;
         }
       } catch {
@@ -414,4 +459,5 @@ const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 server.listen(PORT, () => {
   console.log(`Accessible terminal running at http://localhost:${PORT}`);
   console.log(`Shell: ${shell}   Working directory: ${defaultCwd}`);
+  console.log(`Ollama proxy: ${OLLAMA_HOST}  (GET /api/ollama/status, /api/ollama/models)`);
 });
