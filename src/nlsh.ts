@@ -262,7 +262,19 @@ Rules:
 - If unclear, make a reasonable assumption
 - Prefer simple, common commands
 - Use the command history for context (e.g. "do that again", "delete the file I just created")
-${process.platform === 'win32' ? '- Prefer PowerShell cmdlets when appropriate (Get-ChildItem, Set-Location, etc.)' : ''}
+- When creating or writing a file, prefer a robust method (not fragile nested quotes):
+${
+  process.platform === 'win32'
+    ? `  - PowerShell: use Set-Content -Path file -Value @'
+content here
+'@  or Out-File
+  - Prefer PowerShell cmdlets when appropriate (Get-ChildItem, Set-Location, etc.)`
+    : `  - Bash: use a heredoc, e.g. cat > file.py << 'EOF'
+code or text here
+EOF
+  - Single quotes around EOF prevent the shell from expanding $, backticks, etc.
+  - Avoid echo "..." with nested quotes for multi-line or quote-heavy content`
+}
 
 User request: ${userInput}`;
 
@@ -278,7 +290,13 @@ User request: ${userInput}`;
     60000
   )) as { response?: string };
 
-  return (data.response || '').trim();
+  let command = (data.response || '').trim();
+  // Strip accidental markdown fences if the model ignores instructions
+  command = command
+    .replace(/^```(?:bash|sh|shell|powershell|pwsh)?\s*/i, '')
+    .replace(/\n?```$/i, '')
+    .trim();
+  return command;
 }
 
 function isNaturalLanguage(text: string): boolean {
