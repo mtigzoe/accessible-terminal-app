@@ -71,16 +71,9 @@
   button:disabled { opacity: 0.55; cursor: not-allowed; }
   .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
-  /* nlsh progress */
   #nlsh-progress[hidden] { display: none; }
-  #nlsh-progress {
-    margin-top: 12px;
-  }
-  #nlsh-progress-text {
-    margin: 0 0 8px;
-    color: var(--muted);
-    font-size: 0.95rem;
-  }
+  #nlsh-progress { margin-top: 12px; }
+  #nlsh-progress-text { margin: 0 0 8px; color: var(--muted); font-size: 0.95rem; }
   #nlsh-progress-bar {
     width: 100%;
     height: 0.65rem;
@@ -89,83 +82,35 @@
     background: #222;
     overflow: hidden;
     appearance: none;
+    accent-color: var(--accent);
   }
-  #nlsh-progress-bar:not([value]) {
-    background:
-      linear-gradient(
-        90deg,
-        #222 0%,
-        var(--accent) 40%,
-        #222 80%
-      );
-    background-size: 200% 100%;
-    animation: nlsh-indeterminate 1.2s linear infinite;
+  #nlsh-progress-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
-  @keyframes nlsh-indeterminate {
-    0% { background-position: 100% 0; }
-    100% { background-position: -100% 0; }
-  }
-  html[data-high-contrast="true"] #nlsh-progress-bar:not([value]) {
-    background:
-      linear-gradient(
-        90deg,
-        #000 0%,
-        #ffff00 40%,
-        #000 80%
-      );
-    background-size: 200% 100%;
+  #nlsh-progress-row progress { flex: 1 1 auto; }
+  #nlsh-progress-percent {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    min-width: 3.25rem;
+    text-align: right;
+    color: var(--accent);
   }
 
-  /* Structured results panel */
   #structured-panel[hidden] { display: none; }
   #structured-content { margin: 0; }
-  #structured-content h3 {
-    font-size: 1.05rem;
-    font-weight: 600;
-    margin: 0 0 10px;
-    color: var(--text);
-  }
-  #structured-content .summary {
-    margin: 0 0 12px;
-    color: var(--muted);
-  }
-  #structured-content ul {
-    list-style: none;
-    margin: 0 0 12px;
-    padding: 0;
-  }
-  #structured-content li {
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 10px 12px;
-    margin-bottom: 8px;
-  }
-  #structured-content li.current {
-    border-color: var(--accent);
-  }
-  #structured-content .item-title {
-    font-weight: 600;
-    margin: 0 0 4px;
-  }
-  #structured-content .item-meta {
-    color: var(--muted);
-    font-size: 0.9rem;
-    margin: 0 0 8px;
-  }
+  #structured-content h3 { font-size: 1.05rem; font-weight: 600; margin: 0 0 10px; color: var(--text); }
+  #structured-content .summary { margin: 0 0 12px; color: var(--muted); }
+  #structured-content ul { list-style: none; margin: 0 0 12px; padding: 0; }
+  #structured-content li { border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; margin-bottom: 8px; }
+  #structured-content li.current { border-color: var(--accent); }
+  #structured-content .item-title { font-weight: 600; margin: 0 0 4px; }
+  #structured-content .item-meta { color: var(--muted); font-size: 0.9rem; margin: 0 0 8px; }
   #structured-content .item-actions,
-  #structured-content .global-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  #structured-content button.danger {
-    border-color: var(--error);
-    color: var(--error);
-  }
-  #structured-content .empty-note {
-    color: var(--muted);
-    margin: 0;
-  }
+  #structured-content .global-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  #structured-content button.danger { border-color: var(--error); color: var(--error); }
+  #structured-content .empty-note { color: var(--muted); margin: 0; }
 </style>
 </head>
 <body>
@@ -211,7 +156,10 @@
         aria-busy="false"
         aria-labelledby="nlsh-progress-text">
         <p id="nlsh-progress-text"></p>
-        <progress id="nlsh-progress-bar" aria-label="Translation progress"></progress>
+        <div class="nlsh-progress-row" id="nlsh-progress-row">
+          <progress id="nlsh-progress-bar" max="100" value="0" aria-label="Translation progress"></progress>
+          <span id="nlsh-progress-percent" aria-hidden="true">0%</span>
+        </div>
       </div>
     </section>
   </main>
