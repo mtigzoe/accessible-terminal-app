@@ -345,7 +345,7 @@ function isNaturalLanguage(text: string): boolean {
 
   const shellStarters = [
     'cd ', 'ls ', 'dir ', 'echo ', 'cat ', 'type ', 'mkdir ', 'md ', 'rm ', 'del ',
-    'cp ', 'copy ', 'mv ', 'move ', 'git ', 'npm ', 'node ', 'npx ', 'python',
+    'cp ', 'copy ', 'mv ', 'move ', 'git ', 'npm ', 'node ', 'npx ', 'python', 'python3',
     'pip ', 'brew ', 'curl ', 'wget ', 'chmod ', 'chown ', 'sudo ', 'vi ', 'vim ',
     'nano ', 'code ', 'open ', 'export ', 'source ', 'docker ', 'kubectl ', 'aws ',
     'gcloud ', 'Get-', 'Set-', 'New-', 'Remove-', 'Write-', './', '.\\', '/', '~',
@@ -359,27 +359,55 @@ function isNaturalLanguage(text: string): boolean {
 }
 
 /**
- * Run a shell command with the real terminal attached (stdin/stdout/stderr).
- * Needed so interactive programs (python input(), read, etc.) show prompts
- * and can accept keyboard input.
+ * Run a shell command on the real terminal.
+ *
+ * Node readline puts stdin in raw mode. Python's input() and similar need
+ * cooked mode + a shared TTY. We fully release stdin to the child, then
+ * restore readline afterward.
  */
 function runShell(
   cmd: string,
   rl?: readline.Interface
 ): Promise<{ code: number | null }> {
   return new Promise((resolve) => {
+    const stdin = process.stdin;
+    const wasRaw =
+      stdin.isTTY && typeof (stdin as NodeJS.ReadStream).isRaw === 'boolean'
+        ? (stdin as NodeJS.ReadStream).isRaw
+        : false;
+
     if (rl) {
       rl.pause();
     }
+    if (stdin.isTTY) {
+      try {
+        stdin.setRawMode(false);
+      } catch {
+        // ignore
+      }
+    }
+    stdin.resume();
+
+    const env = {
+      ...process.env,
+      PYTHONUNBUFFERED: '1'
+    };
 
     const child = spawn(cmd, {
       cwd: process.cwd(),
       shell: defaultShell(),
-      env: process.env,
+      env,
       stdio: 'inherit'
     });
 
     const finish = (code: number | null) => {
+      if (stdin.isTTY) {
+        try {
+          stdin.setRawMode(wasRaw || true);
+        } catch {
+          // ignore
+        }
+      }
       if (rl) {
         rl.resume();
       }
