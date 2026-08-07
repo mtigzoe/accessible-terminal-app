@@ -118,11 +118,74 @@ async function listModels(): Promise<string[]> {
 // Readline helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Readline completer: Tab expands file names and built-ins.
+ * Matches are relative to process.cwd().
+ */
+function completer(line: string): [string[], string] {
+  const m = line.match(/(?:^|[\s;|&])([^\s;|&]*)$/);
+  const token = m ? m[1] : line;
+
+  const hits: string[] = [];
+
+  // Built-ins for start of line
+  const builtins = ['!model', '!help', '!cmd ', 'exit', 'quit', 'cd ', 'ls', 'pwd'];
+  if (!line.includes(' ') || line.startsWith(token)) {
+    for (const b of builtins) {
+      if (b.startsWith(line) || b.startsWith(token)) {
+        if (line.includes(' ')) {
+          if (b.startsWith(token)) hits.push(b);
+        } else if (b.startsWith(line)) {
+          hits.push(b);
+        }
+      }
+    }
+  }
+
+  // Path completion on last token
+  let prefix = token;
+  let dir = process.cwd();
+  try {
+    const sep = Math.max(prefix.lastIndexOf('/'), prefix.lastIndexOf('\\'));
+    let dirPrefix = '';
+    if (sep >= 0) {
+      dirPrefix = prefix.slice(0, sep + 1);
+      prefix = prefix.slice(sep + 1);
+      const candidate = path.resolve(process.cwd(), dirPrefix);
+      if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
+        dir = candidate;
+      } else {
+        return [hits.length ? hits : [], token];
+      }
+    }
+
+    const lower = prefix.toLowerCase();
+    for (const name of fs.readdirSync(dir)) {
+      if (!name.toLowerCase().startsWith(lower)) continue;
+      let full = dirPrefix + name;
+      try {
+        if (fs.statSync(path.join(dir, name)).isDirectory()) {
+          full += path.sep;
+        }
+      } catch {
+        // ignore
+      }
+      hits.push(full);
+    }
+  } catch {
+    // ignore
+  }
+
+  const unique = Array.from(new Set(hits));
+  return [unique.length ? unique : [], token];
+}
+
 function createRl(): readline.Interface {
   return readline.createInterface({
     input: process.stdin,
     output: process.stdout,
-    terminal: true
+    terminal: true,
+    completer
   });
 }
 
@@ -188,6 +251,7 @@ function showHelp(): void {
   console.log('\x1b[36mexit\x1b[0m / \x1b[36mquit\x1b[0m     Leave nlsh');
   console.log();
   console.log('Type natural language for AI translation, or a real shell command to run it as-is.');
+  console.log('Press \x1b[36mTab\x1b[0m to complete file and folder names in the current directory.');
   console.log();
 }
 
