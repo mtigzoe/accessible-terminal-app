@@ -28,7 +28,6 @@ interface HistoryEntry {
 
 const commandHistory: HistoryEntry[] = [];
 
-/** Shell binary for child_process (must be a string for TypeScript). */
 function defaultShell(): string {
   if (process.platform === 'win32') {
     return process.env.ComSpec || 'powershell.exe';
@@ -358,26 +357,34 @@ function isNaturalLanguage(text: string): boolean {
   return !shellStarters.some((s) => text.startsWith(s));
 }
 
+function attachSigint(rl: readline.Interface): void {
+  rl.on('SIGINT', () => {
+    process.stdout.write('\n');
+    try {
+      rl.write(null, { ctrl: true, name: 'u' });
+    } catch {
+      // ignore
+    }
+  });
+}
+
 /**
  * Run a shell command on the real terminal.
- *
- * Node readline puts stdin in raw mode. Python's input() and similar need
- * cooked mode + a shared TTY. We fully release stdin to the child, then
- * restore readline afterward.
+ * After the child exits, drain leftover stdin and recreate readline so the
+ * next prompt does not require an extra Enter.
  */
 function runShell(
   cmd: string,
-  rl?: readline.Interface
+  session: { rl: readline.Interface }
 ): Promise<{ code: number | null }> {
   return new Promise((resolve) => {
     const stdin = process.stdin;
-    const wasRaw =
-      stdin.isTTY && typeof (stdin as NodeJS.ReadStream).isRaw === 'boolean'
-        ? (stdin as NodeJS.ReadStream).isRaw
-        : false;
+    const oldRl = session.rl;
 
-    if (rl) {
-      rl.pause();
+    try {
+      oldRl.pause();
+    } catch {
+      // ignore
     }
     if (stdin.isTTY) {
       try {
@@ -401,17 +408,30 @@ function runShell(
     });
 
     const finish = (code: number | null) => {
-      if (stdin.isTTY) {
-        try {
-          stdin.setRawMode(wasRaw || true);
-        } catch {
-          // ignore
+      try {
+        stdin.resume();
+        const rs = stdin as NodeJS.ReadStream & { read?: () => unknown };
+        if (typeof rs.read === 'function') {
+          while (rs.read() !== null) {
+            // discard leftover bytes from mode switch
+          }
         }
+      } catch {
+        // ignore
       }
-      if (rl) {
-        rl.resume();
+
+      try {
+        oldRl.removeAllListeners();
+        oldRl.close();
+      } catch {
+        // ignore
       }
-      resolve({ code });
+
+      const next = createRl();
+      attachSigint(next);
+      session.rl = next;
+
+      setImmediate(() => resolve({ code }));
     };
 
     child.on('error', (err) => {
@@ -441,16 +461,12 @@ async function main(): Promise<void> {
   loadEnv();
   process.env.OLLAMA_HOST = process.env.OLLAMA_HOST || 'http://localhost:11434';
 
-  const rl = createRl();
-
-  rl.on('SIGINT', () => {
-    process.stdout.write('\n');
-    rl.write(null, { ctrl: true, name: 'u' });
-  });
+  const session = { rl: createRl() };
+  attachSigint(session.rl);
 
   const firstRun = !process.env.OLLAMA_MODEL;
   if (firstRun) {
-    await setupModel(rl);
+    await setupModel(session.rl);
   }
 
   const model = process.env.OLLAMA_MODEL || '(none — type !model)';
@@ -463,14 +479,14 @@ async function main(): Promise<void> {
     try {
       const cwd = process.cwd();
       const base = path.basename(cwd) || cwd;
-      const userInput = await question(rl, `\x1b[32m${base}\x1b[0m > `);
+      const userInput = await question(session.rl, `\x1b[32m${base}\x1b[0m > `);
 
       if (!userInput) {
         continue;
       }
 
       if (userInput === 'exit' || userInput === 'quit') {
-        rl.close();
+        session.rl.close();
         process.exit(0);
       }
 
@@ -484,7 +500,7 @@ async function main(): Promise<void> {
       }
 
       if (userInput === '!model') {
-        await setupModel(rl);
+        await setupModel(session.rl);
         continue;
       }
 
@@ -504,13 +520,13 @@ async function main(): Promise<void> {
         if (!direct) {
           continue;
         }
-        await runShell(direct, rl);
+        await runShell(direct, session);
         addToHistory(direct, '(interactive / live output)');
         continue;
       }
 
       if (!isNaturalLanguage(userInput)) {
-        await runShell(userInput, rl);
+        await runShell(userInput, session);
         addToHistory(userInput, '(interactive / live output)');
         continue;
       }
@@ -521,7 +537,7 @@ async function main(): Promise<void> {
         continue;
       }
 
-      const confirm = await question(rl, `\x1b[33m→ ${command}\x1b[0m [Enter] `);
+      const confirm = await question(session.rl, `\x1b[33m→ ${command}\x1b[0m [Enter] `);
       if (confirm !== '') {
         continue;
       }
@@ -536,7 +552,7 @@ async function main(): Promise<void> {
         continue;
       }
 
-      await runShell(command, rl);
+      await runShell(command, session);
       addToHistory(command, '(interactive / live output)');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
