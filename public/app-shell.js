@@ -17,34 +17,26 @@
         typeof focusItemIndex === 'number' && focusItemIndex >= 0
           ? focusItemIndex
           : 0;
-      if (menuItems[index]) {
-        menuItems[index].focus();
-      }
+      if (menuItems[index]) menuItems[index].focus();
     } else {
       menuToggle.focus();
     }
   }
 
   function focusMenuItem(index) {
-    if (!menuItems.length) {
-      return;
-    }
+    if (!menuItems.length) return;
     const n = menuItems.length;
     const i = ((index % n) + n) % n;
     menuItems[i].focus();
   }
 
   function currentMenuIndex() {
-    const active = document.activeElement;
-    return menuItems.indexOf(active);
+    return menuItems.indexOf(document.activeElement);
   }
 
   menuToggle.addEventListener('click', function () {
-    if (isMenuOpen()) {
-      setMenuOpen(false);
-    } else {
-      setMenuOpen(true, 0);
-    }
+    if (isMenuOpen()) setMenuOpen(false);
+    else setMenuOpen(true, 0);
   });
 
   menuToggle.addEventListener('keydown', function (event) {
@@ -58,11 +50,8 @@
   });
 
   menuPanel.addEventListener('keydown', function (event) {
-    if (!isMenuOpen()) {
-      return;
-    }
+    if (!isMenuOpen()) return;
     const idx = currentMenuIndex();
-
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       focusMenuItem(idx < 0 ? 0 : idx + 1);
@@ -123,7 +112,6 @@
   let pendingCommand = null;
   let restoredPath = null;
   let pathRestoreAttempted = false;
-
   let commandOutputChunks = [];
 
   let completionRequestId = 0;
@@ -179,18 +167,14 @@
   }
 
   function sendStdin(text) {
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-      return;
-    }
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
     const line = text == null ? '' : String(text);
     appendOutput(line + '\n');
     socket.send(line + '\n');
   }
 
   function pathsEqual(a, b) {
-    if (!a || !b) {
-      return false;
-    }
+    if (!a || !b) return false;
     const norm = function (p) {
       return String(p).replace(/[\\/]+$/, '').toLowerCase();
     };
@@ -198,15 +182,12 @@
   }
 
   function setPath(path) {
-    if (!path || path === currentPath) {
-      return;
-    }
+    if (!path || path === currentPath) return;
     currentPath = path;
     pathEl.textContent = path;
     try {
       localStorage.setItem('terminal-last-path', path);
-    } catch {
-    }
+    } catch (e) {}
   }
 
   function restorePath() {
@@ -217,19 +198,13 @@
         currentPath = restoredPath;
         pathEl.textContent = restoredPath;
       }
-    } catch {
-    }
+    } catch (e) {}
   }
 
   function appendOutput(text) {
-    if (!text) {
-      return;
-    }
-    if (outputEl.value) {
-      outputEl.value += text;
-    } else {
-      outputEl.value = text.replace(/^\n+/, '');
-    }
+    if (!text) return;
+    if (outputEl.value) outputEl.value += text;
+    else outputEl.value = text.replace(/^\n+/, '');
     outputEl.scrollTop = outputEl.scrollHeight;
   }
 
@@ -249,27 +224,20 @@
     while ((match = oscRe.exec(chunk)) !== null) {
       const parts = match[1].split(';');
       const code = parts[0];
-      if (code === 'D') {
-        lastExitOk = parts[1] === '0';
-      } else if (code === 'A') {
-        finishCommand();
-      }
+      if (code === 'D') lastExitOk = parts[1] === '0';
+      else if (code === 'A') finishCommand();
     }
     return chunk.replace(/\u001b\]633;[^\u0007]*\u0007/g, '');
   }
 
   function clearStructuredView() {
-    if (!structuredPanel || !structuredContent) {
-      return;
-    }
+    if (!structuredPanel || !structuredContent) return;
     structuredContent.innerHTML = '';
     structuredPanel.hidden = true;
   }
 
   function normalizeGitCommand(cmd) {
-    if (!cmd) {
-      return '';
-    }
+    if (!cmd) return '';
     return String(cmd).trim().toLowerCase().replace(/\s+/g, ' ');
   }
 
@@ -280,21 +248,12 @@
 
   function isGitBranchCommand(cmd) {
     const n = normalizeGitCommand(cmd);
-    return (
-      n === 'git branch' ||
-      n === 'git branch -v' ||
-      n === 'git branch -vv' ||
-      n === 'git branch --list'
-    );
+    return n === 'git branch' || n === 'git branch -v' || n === 'git branch -vv' || n === 'git branch --list';
   }
 
   function interpretOutput(command, outputText) {
-    if (isGitStatusCommand(command)) {
-      return interpretGitStatus(outputText);
-    }
-    if (isGitBranchCommand(command)) {
-      return interpretGitBranch(outputText);
-    }
+    if (isGitStatusCommand(command)) return interpretGitStatus(outputText);
+    if (isGitBranchCommand(command)) return interpretGitBranch(outputText);
     return null;
   }
 
@@ -302,7 +261,6 @@
     const lines = String(text || '').split('\n').map(function (l) {
       return l.replace(/\r$/, '');
     });
-
     let branch = null;
     let ahead = null;
     let behind = null;
@@ -310,7 +268,6 @@
     const unstaged = [];
     const untracked = [];
     let section = null;
-
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const branchMatch = line.match(/^On branch\s+(.+)\s*$/i);
@@ -318,15 +275,10 @@
         branch = branchMatch[1].trim();
         continue;
       }
-      const aheadBehind = line.match(
-        /Your branch is (ahead of|behind) '([^']+)' by (\d+) commit/i
-      );
+      const aheadBehind = line.match(/Your branch is (ahead of|behind) '([^']+)' by (\d+) commit/i);
       if (aheadBehind) {
-        if (/ahead/i.test(aheadBehind[1])) {
-          ahead = parseInt(aheadBehind[3], 10);
-        } else {
-          behind = parseInt(aheadBehind[3], 10);
-        }
+        if (/ahead/i.test(aheadBehind[1])) ahead = parseInt(aheadBehind[3], 10);
+        else behind = parseInt(aheadBehind[3], 10);
         continue;
       }
       if (/Changes to be committed/i.test(line)) {
@@ -341,9 +293,7 @@
         section = 'untracked';
         continue;
       }
-      if (/^\s*$/.test(line) || /^\s*\(use "/i.test(line) || /^no changes added/i.test(line)) {
-        continue;
-      }
+      if (/^\s*$/.test(line) || /^\s*\(use "/i.test(line) || /^no changes added/i.test(line)) continue;
       const fileMatch = line.match(/^\s*(modified|new file|deleted|renamed):\s+(.+)$/i);
       if (fileMatch) {
         const entry = fileMatch[1].toLowerCase() + ': ' + fileMatch[2].trim();
@@ -351,68 +301,35 @@
         else if (section === 'unstaged') unstaged.push(entry);
         continue;
       }
-      if (section === 'untracked' && /^\s+\S/.test(line)) {
-        untracked.push(line.trim());
-      }
+      if (section === 'untracked' && /^\s+\S/.test(line)) untracked.push(line.trim());
     }
-
-    if (!branch && staged.length === 0 && unstaged.length === 0 && untracked.length === 0) {
-      return null;
-    }
-
+    if (!branch && staged.length === 0 && unstaged.length === 0 && untracked.length === 0) return null;
     const summaryParts = [];
     if (branch) summaryParts.push('Branch ' + branch);
     if (ahead) summaryParts.push(ahead + ' commit' + (ahead === 1 ? '' : 's') + ' ahead');
     if (behind) summaryParts.push(behind + ' commit' + (behind === 1 ? '' : 's') + ' behind');
-    if (staged.length === 0 && unstaged.length === 0 && untracked.length === 0) {
-      summaryParts.push('working tree clean');
-    } else {
+    if (staged.length === 0 && unstaged.length === 0 && untracked.length === 0) summaryParts.push('working tree clean');
+    else {
       if (staged.length) summaryParts.push(staged.length + ' staged');
       if (unstaged.length) summaryParts.push(unstaged.length + ' unstaged');
       if (untracked.length) summaryParts.push(untracked.length + ' untracked');
     }
-
     const items = [];
     function addFileGroup(label, files) {
       if (!files.length) return;
-      items.push({
-        title: label,
-        meta: files.join(', '),
-        actions: []
-      });
+      items.push({ title: label, meta: files.join(', '), actions: [] });
     }
     addFileGroup('Staged changes', staged);
     addFileGroup('Unstaged changes', unstaged);
     addFileGroup('Untracked files', untracked);
-
     const globalActions = [
       { id: 'diff', label: 'View diff', command: 'git diff' },
       { id: 'log', label: 'Recent commits', command: 'git log --oneline -n 10' }
     ];
-    if (staged.length > 0) {
-      globalActions.unshift({
-        id: 'commit',
-        label: 'Commit staged changes',
-        command: 'git commit'
-      });
-    }
-    if (ahead && ahead > 0) {
-      globalActions.unshift({ id: 'push', label: 'Push', command: 'git push' });
-    }
-    if (unstaged.length > 0 || untracked.length > 0) {
-      globalActions.push({
-        id: 'add-all',
-        label: 'Stage all changes',
-        command: 'git add -A'
-      });
-    }
-
-    return {
-      title: 'Git status',
-      summary: summaryParts.join('. ') + '.',
-      items: items,
-      globalActions: globalActions
-    };
+    if (staged.length > 0) globalActions.unshift({ id: 'commit', label: 'Commit staged changes', command: 'git commit' });
+    if (ahead && ahead > 0) globalActions.unshift({ id: 'push', label: 'Push', command: 'git push' });
+    if (unstaged.length > 0 || untracked.length > 0) globalActions.push({ id: 'add-all', label: 'Stage all changes', command: 'git add -A' });
+    return { title: 'Git status', summary: summaryParts.join('. ') + '.', items: items, globalActions: globalActions };
   }
 
   function interpretGitBranch(text) {
@@ -424,28 +341,13 @@
       .filter(function (l) {
         return l.trim().length > 0;
       });
-
     const branches = [];
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const m = line.match(/^([* ])\s+(\S+)(?:\s+(.*))?$/);
-      if (!m) {
-        continue;
-      }
-      const isCurrent = m[1] === '*';
-      const name = m[2];
-      const rest = (m[3] || '').trim();
-      branches.push({
-        name: name,
-        isCurrent: isCurrent,
-        meta: rest || null
-      });
+      const m = lines[i].match(/^([* ])\s+(\S+)(?:\s+(.*))?$/);
+      if (!m) continue;
+      branches.push({ name: m[2], isCurrent: m[1] === '*', meta: (m[3] || '').trim() || null });
     }
-
-    if (branches.length === 0) {
-      return null;
-    }
-
+    if (branches.length === 0) return null;
     const current = branches.find(function (b) {
       return b.isCurrent;
     });
@@ -457,36 +359,16 @@
       ' local branch' +
       (branches.length === 1 ? '' : 'es') +
       '.';
-
     const items = branches.map(function (b) {
       const actions = [];
       if (!b.isCurrent) {
-        actions.push({
-          id: 'switch-' + b.name,
-          label: 'Switch to this branch',
-          command: 'git switch ' + b.name
-        });
-        actions.push({
-          id: 'delete-' + b.name,
-          label: 'Delete branch',
-          command: 'git branch -d ' + b.name,
-          confirm: true
-        });
+        actions.push({ id: 'switch-' + b.name, label: 'Switch to this branch', command: 'git switch ' + b.name });
+        actions.push({ id: 'delete-' + b.name, label: 'Delete branch', command: 'git branch -d ' + b.name, confirm: true });
       } else {
-        actions.push({
-          id: 'status',
-          label: 'Show status',
-          command: 'git status'
-        });
+        actions.push({ id: 'status', label: 'Show status', command: 'git status' });
       }
-      return {
-        title: b.name + (b.isCurrent ? ' (current)' : ''),
-        meta: b.meta,
-        current: b.isCurrent,
-        actions: actions
-      };
+      return { title: b.name + (b.isCurrent ? ' (current)' : ''), meta: b.meta, current: b.isCurrent, actions: actions };
     });
-
     return {
       title: 'Git branches',
       summary: summary,
@@ -503,42 +385,32 @@
       clearStructuredView();
       return;
     }
-
     structuredContent.innerHTML = '';
-
     const heading = document.createElement('h3');
     heading.textContent = view.title || 'Results';
     structuredContent.appendChild(heading);
-
     if (view.summary) {
       const summary = document.createElement('p');
       summary.className = 'summary';
       summary.textContent = view.summary;
       structuredContent.appendChild(summary);
     }
-
     if (view.items && view.items.length) {
       const list = document.createElement('ul');
       list.setAttribute('aria-label', view.title || 'Items');
-
       view.items.forEach(function (item) {
         const li = document.createElement('li');
-        if (item.current) {
-          li.className = 'current';
-        }
-
+        if (item.current) li.className = 'current';
         const title = document.createElement('p');
         title.className = 'item-title';
         title.textContent = item.title || '';
         li.appendChild(title);
-
         if (item.meta) {
           const meta = document.createElement('p');
           meta.className = 'item-meta';
           meta.textContent = item.meta;
           li.appendChild(meta);
         }
-
         if (item.actions && item.actions.length) {
           const actions = document.createElement('div');
           actions.className = 'item-actions';
@@ -547,10 +419,8 @@
           });
           li.appendChild(actions);
         }
-
         list.appendChild(li);
       });
-
       structuredContent.appendChild(list);
     } else {
       const empty = document.createElement('p');
@@ -558,7 +428,6 @@
       empty.textContent = 'No detailed items.';
       structuredContent.appendChild(empty);
     }
-
     if (view.globalActions && view.globalActions.length) {
       const global = document.createElement('div');
       global.className = 'global-actions';
@@ -568,7 +437,6 @@
       });
       structuredContent.appendChild(global);
     }
-
     structuredPanel.hidden = false;
     announce(
       (view.title || 'Structured results') +
@@ -582,9 +450,7 @@
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.textContent = action.label || action.id || 'Run';
-    if (action.confirm) {
-      btn.className = 'danger';
-    }
+    if (action.confirm) btn.className = 'danger';
     btn.addEventListener('click', function () {
       runStructuredAction(action);
     });
@@ -592,13 +458,9 @@
   }
 
   function runStructuredAction(action) {
-    if (!action || !action.command) {
-      return;
-    }
+    if (!action || !action.command) return;
     if (action.confirm) {
-      const ok = window.confirm(
-        'Run this command?\n\n' + action.command + '\n\nThis may be destructive.'
-      );
+      const ok = window.confirm('Run this command?\n\n' + action.command + '\n\nThis may be destructive.');
       if (!ok) {
         announce('Cancelled.');
         commandEl.focus();
@@ -609,28 +471,18 @@
   }
 
   function tryBuildStructuredView(command) {
-    const outputText = commandOutputChunks.join('');
-    const view = interpretOutput(command, outputText);
-    if (view) {
-      renderStructuredView(view);
-    } else {
-      clearStructuredView();
-    }
+    const view = interpretOutput(command, commandOutputChunks.join(''));
+    if (view) renderStructuredView(view);
+    else clearStructuredView();
   }
 
   function finishCommand() {
-    if (!commandRunning) {
-      return;
-    }
+    if (!commandRunning) return;
     commandRunning = false;
     const status = lastExitOk ? 'succeeded' : 'failed';
     const label = pendingCommand ? pendingCommand : 'Command';
     announce(label + ' ' + status + '.');
-
-    if (pendingCommand) {
-      tryBuildStructuredView(pendingCommand);
-    }
-
+    if (pendingCommand) tryBuildStructuredView(pendingCommand);
     pendingCommand = null;
     commandOutputChunks = [];
     if (ready && socket.readyState === WebSocket.OPEN) {
@@ -640,22 +492,16 @@
   }
 
   function requestPathRestore(target) {
-    if (!target || !socket || socket.readyState !== WebSocket.OPEN) {
-      return;
-    }
+    if (!target || !socket || socket.readyState !== WebSocket.OPEN) return;
     socket.send(JSON.stringify({ type: 'cwd', cwd: target }));
   }
 
   function focusOutput() {
-    if (commandEl.disabled) {
-      return;
-    }
+    if (commandEl.disabled) return;
     outputEl.focus();
-    const end = outputEl.value.length;
     try {
-      outputEl.setSelectionRange(end, end);
-    } catch {
-    }
+      outputEl.setSelectionRange(outputEl.value.length, outputEl.value.length);
+    } catch (e) {}
     announce('Output focused.');
   }
 
@@ -671,9 +517,8 @@
       setControlsEnabled(true);
       if (restoredPath && !pathsEqual(path, restoredPath) && !pathRestoreAttempted) {
         pathRestoreAttempted = true;
-        const target = restoredPath;
-        requestPathRestore(target);
-        announce('Shell ready. Restoring path ' + target + '.');
+        requestPathRestore(restoredPath);
+        announce('Shell ready. Restoring path ' + restoredPath + '.');
       } else {
         announce('Shell ready. Current path ' + path + '. Type a command.');
       }
@@ -694,22 +539,16 @@
         onPromptSeen(promptPath);
         continue;
       }
-      if (commandRunning && pendingCommand && line.trim() === pendingCommand) {
-        continue;
-      }
+      if (commandRunning && pendingCommand && line.trim() === pendingCommand) continue;
       displayLines.push(line);
-      if (commandRunning) {
-        commandOutputChunks.push(line + '\n');
-      }
+      if (commandRunning) commandOutputChunks.push(line + '\n');
     }
     const tailPath = matchPrompt(rawBuffer);
     if (tailPath) {
       onPromptSeen(tailPath);
       rawBuffer = '';
     }
-    if (displayLines.length > 0) {
-      appendOutput(displayLines.join('\n') + '\n');
-    }
+    if (displayLines.length > 0) appendOutput(displayLines.join('\n') + '\n');
   }
 
   function resetCompletion() {
@@ -721,20 +560,13 @@
   }
 
   function applyCompletionMatch(index) {
-    if (!completion.matches.length) {
-      return;
-    }
+    if (!completion.matches.length) return;
     const match = completion.matches[index];
     completion.index = index;
-    if (completion.matches.length === 1) {
-      announceAlert(match);
-    } else {
-      announceAlert((index + 1) + ' of ' + completion.matches.length + ', ' + match);
-    }
+    if (completion.matches.length === 1) announceAlert(match);
+    else announceAlert(index + 1 + ' of ' + completion.matches.length + ', ' + match);
     const before = completion.baseLine.slice(0, completion.replacementIndex);
-    const after = completion.baseLine.slice(
-      completion.replacementIndex + completion.replacementLength
-    );
+    const after = completion.baseLine.slice(completion.replacementIndex + completion.replacementLength);
     const newLine = before + match + after;
     const caret = before.length + match.length;
     applyingCompletion = true;
@@ -745,11 +577,8 @@
 
   function cycleCompletion(direction) {
     const n = completion.matches.length;
-    if (n === 0) {
-      return;
-    }
-    const next = (completion.index + direction + n) % n;
-    applyCompletionMatch(next);
+    if (n === 0) return;
+    applyCompletionMatch((completion.index + direction + n) % n);
   }
 
   function requestTabCompletion(direction) {
@@ -761,14 +590,9 @@
       cycleCompletion(direction);
       return;
     }
-    if (completionPending) {
-      return;
-    }
+    if (completionPending) return;
     const line = commandEl.value;
-    const cursor =
-      typeof commandEl.selectionStart === 'number'
-        ? commandEl.selectionStart
-        : line.length;
+    const cursor = typeof commandEl.selectionStart === 'number' ? commandEl.selectionStart : line.length;
     const baseLine = line;
     completionPending = true;
     completionRequestId += 1;
@@ -776,17 +600,10 @@
     fetch('/api/complete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: id,
-        line: line,
-        cursor: cursor,
-        cwd: currentPath || undefined
-      })
+      body: JSON.stringify({ id: id, line: line, cursor: cursor, cwd: currentPath || undefined })
     })
       .then(function (response) {
-        if (!response.ok) {
-          throw new Error('Completion request failed (' + response.status + ').');
-        }
+        if (!response.ok) throw new Error('Completion request failed (' + response.status + ').');
         return response.json();
       })
       .then(function (msg) {
@@ -795,19 +612,13 @@
       .catch(function (err) {
         completionPending = false;
         resetCompletion();
-        announce(
-          err && err.message
-            ? err.message
-            : 'Completion request failed. Is the server running the latest code?'
-        );
+        announce(err && err.message ? err.message : 'Completion request failed.');
       });
   }
 
   function handleCompleteResult(msg, baseLine) {
     completionPending = false;
-    if (msg && msg.id != null && msg.id !== completionRequestId) {
-      return;
-    }
+    if (msg && msg.id != null && msg.id !== completionRequestId) return;
     const matches = Array.isArray(msg.matches)
       ? msg.matches
       : typeof msg.matches === 'string'
@@ -819,10 +630,8 @@
       return;
     }
     completion.baseLine = typeof baseLine === 'string' ? baseLine : commandEl.value;
-    completion.replacementIndex =
-      typeof msg.replacementIndex === 'number' ? msg.replacementIndex : 0;
-    completion.replacementLength =
-      typeof msg.replacementLength === 'number' ? msg.replacementLength : 0;
+    completion.replacementIndex = typeof msg.replacementIndex === 'number' ? msg.replacementIndex : 0;
+    completion.replacementLength = typeof msg.replacementLength === 'number' ? msg.replacementLength : 0;
     completion.matches = matches;
     applyCompletionMatch(0);
   }
@@ -861,26 +670,70 @@
     return true;
   }
 
+  var nlshProgressTimer = null;
+  var nlshProgressPercent = 0;
+
+  function clearNlshProgressTimer() {
+    if (nlshProgressTimer) {
+      window.clearInterval(nlshProgressTimer);
+      nlshProgressTimer = null;
+    }
+  }
+
+  function updateNlshProgressPercent(pct, label) {
+    nlshProgressPercent = Math.max(0, Math.min(100, Math.round(pct)));
+    var region = document.getElementById('nlsh-progress');
+    var bar = document.getElementById('nlsh-progress-bar');
+    var textEl = document.getElementById('nlsh-progress-text');
+    var pctEl = document.getElementById('nlsh-progress-percent');
+    var base = label || 'Translating with Ollama…';
+    var withPct = base + ' ' + nlshProgressPercent + '%';
+    if (textEl) textEl.textContent = withPct;
+    if (pctEl) pctEl.textContent = nlshProgressPercent + '%';
+    if (bar) {
+      bar.value = nlshProgressPercent;
+      bar.max = 100;
+      bar.setAttribute('aria-valuenow', String(nlshProgressPercent));
+      bar.setAttribute('aria-valuetext', withPct);
+    }
+    if (region) region.setAttribute('aria-busy', nlshProgressPercent < 100 ? 'true' : 'false');
+  }
+
   function setNlshProgress(active, label) {
     var region = document.getElementById('nlsh-progress');
     var bar = document.getElementById('nlsh-progress-bar');
     var textEl = document.getElementById('nlsh-progress-text');
+    var pctEl = document.getElementById('nlsh-progress-percent');
     if (!region) return;
+    clearNlshProgressTimer();
     if (active) {
       region.hidden = false;
       region.setAttribute('aria-busy', 'true');
-      if (textEl) textEl.textContent = label || 'Translating with Ollama…';
-      if (bar) {
-        bar.removeAttribute('value');
-        bar.setAttribute('aria-valuetext', label || 'Translating with Ollama…');
-      }
       if (runBtn) runBtn.setAttribute('aria-busy', 'true');
+      nlshProgressPercent = 0;
+      updateNlshProgressPercent(0, label);
+      var started = Date.now();
+      nlshProgressTimer = window.setInterval(function () {
+        var elapsed = (Date.now() - started) / 1000;
+        var est = 90 * (1 - Math.exp(-elapsed / 12));
+        if (est > 90) est = 90;
+        updateNlshProgressPercent(est, label);
+      }, 250);
     } else {
-      region.hidden = true;
-      region.setAttribute('aria-busy', 'false');
-      if (textEl) textEl.textContent = '';
-      if (bar) bar.removeAttribute('aria-valuetext');
-      if (runBtn) runBtn.removeAttribute('aria-busy');
+      clearNlshProgressTimer();
+      updateNlshProgressPercent(100, label || 'Translation complete');
+      window.setTimeout(function () {
+        region.hidden = true;
+        region.setAttribute('aria-busy', 'false');
+        if (textEl) textEl.textContent = '';
+        if (pctEl) pctEl.textContent = '';
+        if (bar) {
+          bar.removeAttribute('aria-valuetext');
+          bar.removeAttribute('aria-valuenow');
+          bar.removeAttribute('value');
+        }
+        if (runBtn) runBtn.removeAttribute('aria-busy');
+      }, 350);
     }
   }
 
@@ -900,9 +753,7 @@
     })
       .then(function (r) {
         return r.json().then(function (body) {
-          if (!r.ok || !body.ok) {
-            throw new Error((body && body.error) || 'Translation failed.');
-          }
+          if (!r.ok || !body.ok) throw new Error((body && body.error) || 'Translation failed.');
           return body.command;
         });
       })
@@ -940,11 +791,15 @@
           runBtn.disabled = false;
           commandEl.disabled = false;
           setNlshProgress(false);
-          announce(
+          var msg =
             err && err.message
               ? err.message
-              : 'Could not translate. Is Ollama running? Check Settings → model.'
-          );
+              : 'Could not translate. Is Ollama running? Check Settings → model.';
+          if (/aborted|AbortError/i.test(msg)) {
+            msg =
+              'Translation timed out or was cancelled. Ollama may be slow or unreachable. Try again, use a smaller model, or check Settings.';
+          }
+          announce(msg);
           commandEl.focus();
         });
       return;
@@ -954,25 +809,19 @@
   }
 
   function runCommand(commandText) {
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-      return;
-    }
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
     if (commandRunning) {
-      const text = commandText;
       commandEl.value = '';
-      sendStdin(text);
+      sendStdin(commandText);
       announce('Sent input to running command.');
       return;
     }
     const text = commandText.trim();
-    if (!text) {
-      return;
-    }
+    if (!text) return;
     resetCompletion();
     clearStructuredView();
     commandOutputChunks = [];
-    const echo = (currentPath ? currentPath : '$') + '> ' + text + '\n';
-    appendOutput(echo);
+    appendOutput((currentPath ? currentPath : '$') + '> ' + text + '\n');
     pendingCommand = text;
     commandRunning = true;
     lastExitOk = true;
@@ -991,19 +840,14 @@
   const socket = new WebSocket(protocol + location.host + '/ws');
 
   socket.addEventListener('open', function () {
-    if (restoredPath) {
-      requestPathRestore(restoredPath);
-    } else {
-      socket.send(JSON.stringify({ type: 'cwd', cwd: '' }));
-    }
+    if (restoredPath) requestPathRestore(restoredPath);
+    else socket.send(JSON.stringify({ type: 'cwd', cwd: '' }));
     announce('Connecting. Waiting for shell prompt.');
     window.setTimeout(function () {
       if (!ready && socket.readyState === WebSocket.OPEN) {
         ready = true;
         setControlsEnabled(true);
-        if (!currentPath) {
-          pathEl.textContent = '(shell ready)';
-        }
+        if (!currentPath) pathEl.textContent = '(shell ready)';
         announce('Shell ready. Type a command.');
         commandEl.focus();
       }
@@ -1011,8 +855,7 @@
   });
 
   socket.addEventListener('message', function (event) {
-    const data = typeof event.data === 'string' ? event.data : String(event.data);
-    handleIncoming(data);
+    handleIncoming(typeof event.data === 'string' ? event.data : String(event.data));
   });
 
   socket.addEventListener('close', function () {
@@ -1045,48 +888,35 @@
   });
 
   commandEl.addEventListener('input', function () {
-    if (applyingCompletion) {
-      return;
-    }
-    resetCompletion();
+    if (!applyingCompletion) resetCompletion();
   });
 
   commandEl.addEventListener('keydown', function (event) {
     if (event.ctrlKey && !event.altKey && !event.metaKey && (event.key === 'c' || event.key === 'C')) {
       const start = commandEl.selectionStart;
       const end = commandEl.selectionEnd;
-      if (typeof start === 'number' && typeof end === 'number' && start !== end) {
-        return;
-      }
+      if (typeof start === 'number' && typeof end === 'number' && start !== end) return;
       event.preventDefault();
       sendInterrupt();
       return;
     }
-
     if (event.key === 'Tab') {
       event.preventDefault();
       requestTabCompletion(event.shiftKey ? -1 : 1);
       return;
     }
-
     if (event.key === 'ArrowUp') {
       event.preventDefault();
       resetCompletion();
-      if (history.length === 0) {
-        return;
-      }
-      if (historyIndex === history.length) {
-        draftBeforeHistory = commandEl.value;
-      }
+      if (history.length === 0) return;
+      if (historyIndex === history.length) draftBeforeHistory = commandEl.value;
       historyIndex = Math.max(0, historyIndex - 1);
       commandEl.value = history[historyIndex];
       commandEl.setSelectionRange(commandEl.value.length, commandEl.value.length);
     } else if (event.key === 'ArrowDown') {
       event.preventDefault();
       resetCompletion();
-      if (history.length === 0) {
-        return;
-      }
+      if (history.length === 0) return;
       if (historyIndex >= history.length - 1) {
         historyIndex = history.length;
         commandEl.value = draftBeforeHistory;
@@ -1110,15 +940,12 @@
       const active = document.activeElement;
       if (commandRunning && active !== commandEl) {
         const sel = window.getSelection && window.getSelection();
-        if (sel && String(sel).length > 0) {
-          return;
-        }
+        if (sel && String(sel).length > 0) return;
         event.preventDefault();
         sendInterrupt();
         return;
       }
     }
-
     if (event.altKey && !event.ctrlKey && !event.metaKey) {
       const key = event.key.toLowerCase();
       if (key === 'f2' || event.key === 'F2' || key === 'o') {
