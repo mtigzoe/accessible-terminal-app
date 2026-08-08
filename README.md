@@ -42,15 +42,22 @@ The same accessible UI can also run as a standalone desktop application. The Ele
 
 ### Electron development
 
-Use:
+Run:
 
 ```bash
 npm run electron:dev
 ```
 
-This command starts the **Electron runtime** and loads the TypeScript main process through `ts-node`. Do not run `src/electron/main.ts` directly with `ts-node`; Electron APIs such as `app.isPackaged` are only available when the file is launched by Electron.
+The Electron development command first compiles the TypeScript sources with `tsc` and then launches Electron using the compiled entry point configured by the `main` field in `package.json`:
 
-The Electron main process starts the Express backend on an available localhost port, waits for the server to become ready, and then opens the desktop window.
+```text
+src/electron/main.ts    -> dist/electron/main.js
+src/electron/preload.ts -> dist/electron/preload.js
+```
+
+This approach intentionally does **not** launch `main.ts` directly with `ts-node`. Electron's main process needs the Electron runtime, and compiling first keeps the application in the CommonJS configuration used by this project. It also avoids the `__dirname is not defined` error that occurs when the TypeScript entry point is incorrectly treated as an ES module.
+
+On Windows, you can run `npm run electron:dev` directly from PowerShell. The Electron window will appear on the Windows desktop; SSH is not required for the Electron GUI when the project is running on Windows.
 
 The original browser workflow remains available:
 
@@ -60,13 +67,7 @@ npm run dev
 
 ### Test the compiled Electron application locally
 
-First compile the TypeScript sources:
-
-```bash
-npm run build
-```
-
-Then run the compiled Electron application:
+The `electron` script also builds before launching:
 
 ```bash
 npm run electron
