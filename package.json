@@ -2,12 +2,76 @@
   "name": "accessible-terminal",
   "version": "1.0.0",
   "description": "Simple form-based PowerShell UI (path, output, command) built for screen reader accessibility.",
-  "main": "dist/server.js",
+  "main": "dist/electron/main.js",
   "scripts": {
     "dev": "ts-node src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "nlsh": "ts-node src/nlsh.ts"
+    "nlsh": "ts-node src/nlsh.ts",
+    "electron": "npm run build && electron .",
+    "electron:dev": "ts-node src/electron/main.ts",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder"
+  },
+  "build": {
+    "appId": "com.mtigzoe.accessible-terminal",
+    "productName": "Accessible Terminal",
+    "copyright": "Copyright © 2026",
+    "directories": {
+      "output": "release",
+      "buildResources": "assets"
+    },
+    "files": [
+      "dist/**/*",
+      "public/**/*",
+      "shell-integration/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "shell-integration",
+        "to": "shell-integration"
+      },
+      {
+        "from": "assets",
+        "to": "assets",
+        "filter": ["**/*"]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.developer-tools",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "icon": "assets/icon.png",
+      "category": "Development",
+      "artifactName": "${productName}-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   },
   "dependencies": {
     "electron": "^43.3.0",

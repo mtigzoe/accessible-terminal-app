@@ -36,6 +36,48 @@ npm run build
 npm start
 ```
 
+## Desktop application (Electron)
+
+The same accessible UI can also run as a standalone desktop application.
+
+### Development
+
+```bash
+npm run electron:dev
+```
+
+This starts the Express backend on a free port and opens an Electron window. The original web workflow (`npm run dev`) remains fully available.
+
+### Local production-style run
+
+```bash
+npm run electron
+```
+
+### Building distributables
+
+```bash
+npm run dist
+```
+
+Produces platform installers in the `release/` folder (NSIS on Windows, DMG on macOS, AppImage on Linux).
+
+### Features added by the desktop shell
+
+- Automatic free-port selection (starts at 3000)
+- Application menu (File, Edit, View, Help)
+- System tray icon with “Show Window” and “Quit”
+- Single-instance behaviour
+- Clean shutdown of the backend server process
+
+### Icons (optional)
+
+Place platform icons in an `assets/` directory:
+
+- `icon.png` (Linux / master)
+- `icon.ico` (Windows)
+- `icon.icns` (macOS)
+
 ## How to use (screen reader)
 
 1. When the page loads, wait for “Shell ready” / “Connected to PowerShell.”
