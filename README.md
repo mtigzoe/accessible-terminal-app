@@ -38,29 +38,75 @@ npm start
 
 ## Desktop application (Electron)
 
-The same accessible UI can also run as a standalone desktop application.
+The same accessible UI can also run as a standalone desktop application. The Electron main process is `src/electron/main.ts`, and the preload bridge is `src/electron/preload.ts`.
 
-### Development
+### Electron development
+
+Use:
 
 ```bash
 npm run electron:dev
 ```
 
-This starts the Express backend on a free port and opens an Electron window. The original web workflow (`npm run dev`) remains fully available.
+This command starts the **Electron runtime** and loads the TypeScript main process through `ts-node`. Do not run `src/electron/main.ts` directly with `ts-node`; Electron APIs such as `app.isPackaged` are only available when the file is launched by Electron.
 
-### Local production-style run
+The Electron main process starts the Express backend on an available localhost port, waits for the server to become ready, and then opens the desktop window.
+
+The original browser workflow remains available:
+
+```bash
+npm run dev
+```
+
+### Test the compiled Electron application locally
+
+First compile the TypeScript sources:
+
+```bash
+npm run build
+```
+
+Then run the compiled Electron application:
 
 ```bash
 npm run electron
 ```
 
-### Building distributables
+The compiled Electron entry point is `dist/electron/main.js`, and the preload script is compiled to `dist/electron/preload.js`.
+
+### Build a directory package
+
+```bash
+npm run pack
+```
+
+This runs the TypeScript build and asks `electron-builder` to create an unpacked application directory in `release/`.
+
+### Build distributables
 
 ```bash
 npm run dist
 ```
 
-Produces platform installers in the `release/` folder (NSIS on Windows, DMG on macOS, AppImage on Linux).
+This runs the TypeScript build and creates platform-specific distributables in the `release/` folder:
+
+- Windows: NSIS installer (`.exe`)
+- macOS: DMG (`.dmg`)
+- Linux: AppImage (`.AppImage`)
+
+The target is selected by `electron-builder` for the platform on which the build is run.
+
+### Electron build layout
+
+The TypeScript configuration uses `src` as the source root and `dist` as the output directory:
+
+```text
+src/electron/main.ts      -> dist/electron/main.js
+src/electron/preload.ts   -> dist/electron/preload.js
+src/server.ts             -> dist/server.js
+```
+
+The Electron production configuration includes `dist/`, `public/`, `shell-integration/`, and `package.json` in the application package. Shell integration and application assets are also copied as extra resources.
 
 ### Features added by the desktop shell
 
@@ -69,6 +115,7 @@ Produces platform installers in the `release/` folder (NSIS on Windows, DMG on m
 - System tray icon with “Show Window” and “Quit”
 - Single-instance behaviour
 - Clean shutdown of the backend server process
+- Secure renderer settings with context isolation and a preload bridge
 
 ### Icons (optional)
 
