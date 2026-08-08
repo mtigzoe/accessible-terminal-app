@@ -48,32 +48,39 @@ Run:
 npm run electron:dev
 ```
 
-The Electron development command first compiles the TypeScript sources with `tsc` and then launches Electron using the compiled entry point configured by the `main` field in `package.json`:
+The Electron development command first compiles the TypeScript sources with `tsc` and then launches Electron using the compiled entry point configured by the `main` field in `package.json`.
 
-```text
-src/electron/main.ts    -> dist/electron/main.js
-src/electron/preload.ts -> dist/electron/preload.js
-```
+On Windows, you can run `npm run electron:dev` directly from PowerShell. The Electron window will appear on the Windows desktop.
 
-This approach intentionally does **not** launch `main.ts` directly with `ts-node`. Electron's main process needs the Electron runtime, and compiling first keeps the application in the CommonJS configuration used by this project. It also avoids the `__dirname is not defined` error that occurs when the TypeScript entry point is incorrectly treated as an ES module.
+The original browser workflow remains available with `npm run dev`.
 
-On Windows, you can run `npm run electron:dev` directly from PowerShell. The Electron window will appear on the Windows desktop; SSH is not required for the Electron GUI when the project is running on Windows.
+### Linux Electron launcher
 
-The original browser workflow remains available:
+On Linux, the recommended launcher is:
 
 ```bash
-npm run dev
+./scripts/start-electron.sh
 ```
 
-### Test the compiled Electron application locally
+It defaults to a local Ollama server at:
 
-The `electron` script also builds before launching:
+```text
+http://127.0.0.1:11434
+```
+
+You can specify another Ollama server without editing the script:
+
+```bash
+./scripts/start-electron.sh http://192.168.1.50:11434
+```
+
+The launcher sets `OLLAMA_HOST` for the Electron process and then runs `npm run electron:dev`.
+
+### Test the compiled Electron application locally
 
 ```bash
 npm run electron
 ```
-
-The compiled Electron entry point is `dist/electron/main.js`, and the preload script is compiled to `dist/electron/preload.js`.
 
 ### Build a directory package
 
@@ -81,97 +88,81 @@ The compiled Electron entry point is `dist/electron/main.js`, and the preload sc
 npm run pack
 ```
 
-This runs the TypeScript build and asks `electron-builder` to create an unpacked application directory in `release/`.
-
 ### Build distributables
 
 ```bash
 npm run dist
 ```
 
-This runs the TypeScript build and creates platform-specific distributables in the `release/` folder:
+This creates platform-specific distributables in `release/`:
 
 - Windows: NSIS installer (`.exe`)
 - macOS: DMG (`.dmg`)
 - Linux: AppImage (`.AppImage`)
 
-The target is selected by `electron-builder` for the platform on which the build is run.
-
-### Electron build layout
-
-The TypeScript configuration uses `src` as the source root and `dist` as the output directory:
-
-```text
-src/electron/main.ts      -> dist/electron/main.js
-src/electron/preload.ts   -> dist/electron/preload.js
-src/server.ts             -> dist/server.js
-```
-
-The Electron production configuration includes `dist/`, `public/`, `shell-integration/`, and `package.json` in the application package. Shell integration and application assets are also copied as extra resources.
-
-### Features added by the desktop shell
-
-- Automatic free-port selection (starts at 3000)
-- Application menu (File, Edit, View, Help)
-- System tray icon with “Show Window” and “Quit”
-- Single-instance behaviour
-- Clean shutdown of the backend server process
-- Secure renderer settings with context isolation and a preload bridge
-
-### Icons (optional)
-
-Place platform icons in an `assets/` directory:
-
-- `icon.png` (Linux / master)
-- `icon.ico` (Windows)
-- `icon.icns` (macOS)
-
 ## Ollama on Windows or Linux
 
-The Electron app can run on Windows while using an Ollama server running either on Windows or on another computer such as your Linux machine. The backend reads the `OLLAMA_HOST` environment variable.
+The Electron app can run on Windows or Linux while using an Ollama server on the same computer or on another computer. The backend reads the `OLLAMA_HOST` environment variable, and the Settings page also lets you change the Ollama server without editing scripts.
 
-### Easy Windows launcher
-
-The recommended Windows launcher defaults to your Linux Ollama server and no longer asks you to choose a hostname every time:
+### Windows launcher
 
 ```powershell
 .\scripts\start-electron.ps1
 ```
 
-By default, it uses:
+The Windows launcher defaults to:
 
 ```text
 http://cyber.local:11434
 ```
 
-You can override the Linux Ollama host when needed:
+You can override it when needed:
 
 ```powershell
 .\scripts\start-electron.ps1 -LinuxOllamaHost "http://192.168.1.50:11434"
 ```
 
-The launcher only sets `OLLAMA_HOST` for the Electron process. It does not install, start, stop, or move Ollama models.
+### Linux launcher
 
-### Windows Ollama
-
-If you want to use Ollama installed on Windows instead, set the environment variable before starting Electron:
-
-```powershell
-$env:OLLAMA_HOST="http://127.0.0.1:11434"
-npm run electron:dev
+```bash
+./scripts/start-electron.sh
 ```
 
-### Linux Ollama from Windows Electron
+The Linux launcher defaults to:
 
-When the Electron app runs on Windows and Ollama runs on Linux, the Windows app sends requests to the Linux Ollama server. The model remains on Linux.
+```text
+http://127.0.0.1:11434
+```
 
-The Linux Ollama server must be reachable from Windows and configured to accept connections from the Windows computer. Keep the Ollama port restricted to your trusted network rather than exposing it to the public Internet.
+To use Ollama on another computer:
 
-### Choosing the model
+```bash
+./scripts/start-electron.sh http://192.168.1.50:11434
+```
 
-Open **Settings → Natural language shell (nlsh / Ollama)** and refresh the model list. The models shown are the models available from the configured Ollama server. If the server is Linux, the model remains on Linux; the Windows Electron application sends requests to that Linux server.
+### Change the Ollama server from Settings
 
-The `OLLAMA_MODEL` environment variable can also be used to provide a default model name.
+You do not have to edit either launcher to change servers permanently for the application UI. Open:
+
+**Settings → Natural language shell (nlsh / Ollama)**
+
+Enter the Ollama server address and choose **Connect**. The application tests the connection before switching to it, then refreshes the available models. This setting is saved for the application.
+
+For example:
+
+```text
+http://cyber.local:11434
+http://192.168.1.50:11434
+http://127.0.0.1:11434
+```
+
+When Windows Electron connects to Linux Ollama, the model remains on Linux. The Windows application communicates with the Linux Ollama HTTP API.
+
+The remote Ollama server must be reachable from the computer running Electron and should be restricted to a trusted network rather than exposed to the public Internet.
+
+### Choosing and managing models
+
+Open **Settings → Natural language shell (nlsh / Ollama)**. The application can list installed models, install supported models, remove models, and select the model used for natural-language commands. No `ollama pull` command is required for normal model management.
 
 ## How to use (screen reader)
 
