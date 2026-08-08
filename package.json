@@ -9,7 +9,7 @@
     "start": "node dist/server.js",
     "nlsh": "ts-node src/nlsh.ts",
     "electron": "npm run build && electron .",
-    "electron:dev": "electron -r ts-node/register src/electron/main.ts",
+    "electron:dev": "npm run build && electron .",
     "pack": "npm run build && electron-builder --dir",
     "dist": "npm run build && electron-builder"
   },
