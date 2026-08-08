@@ -41,16 +41,7 @@
   code, pre { font-family: Consolas, "Courier New", monospace; font-size: 0.92em; }
   code { background: #222; border: 1px solid #444; border-radius: 3px; padding: 1px 5px; }
   html[data-high-contrast="true"] code { background: #000; border-color: #fff; }
-  pre {
-    background: #111;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 10px 12px;
-    overflow-x: auto;
-    white-space: pre-wrap;
-    word-break: break-word;
-    margin: 0.5rem 0 0;
-  }
+  pre { background: #111; border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre-wrap; word-break: break-word; margin: 0.5rem 0 0; }
   html[data-high-contrast="true"] pre { background: #000; }
   a.back, a { color: var(--accent); }
 </style>
@@ -76,8 +67,8 @@
       <h2 id="modes-heading">Console modes</h2>
       <p>Under <strong>Settings → Console mode</strong>, or the menu:</p>
       <ul>
-        <li><strong>Accessible</strong> (default) — path, output, and command field. Best for screen readers. Supports natural language when nlsh is enabled.</li>
-        <li><strong>Full console</strong> — real terminal grid (xterm.js) for vim and interactive programs. Open <a href="console.html">Full console</a>. Natural language is not applied here. Use the <strong>accessible buffer</strong> (below) to read output more reliably with a screen reader.</li>
+        <li><strong>Accessible</strong> (default) — path, output, and command field. Best for structured screen-reader reading and natural language.</li>
+        <li><strong>Full console</strong> — real terminal grid (xterm.js + node-pty). Best match for Linux/PowerShell commands, pipes, vim, and interactive programs. Open <a href="console.html">Full console</a>. Use the accessible buffer to read output as plain text.</li>
       </ul>
     </section>
 
@@ -107,9 +98,9 @@
       <h2 id="full-console-heading">Full console and accessible buffer</h2>
       <p>
         The <a href="console.html">Full console</a> is a real terminal (xterm.js) with
-        <code>screenReaderMode</code> enabled. That helps, but a character grid is still harder
-        for screen readers than a normal text field—especially after long output or in
-        programs like vim.
+        <code>screenReaderMode</code> enabled. It talks to a real shell over a TTY, so Linux
+        tools, pipes, and interactive programs behave as they would in a normal terminal.
+        That is why many users find it more capable for day-to-day shell work than the form-style Accessible page.
       </p>
       <p>
         Use the <strong>accessible buffer</strong> when you want a stable, read-only snapshot of
@@ -120,105 +111,54 @@
         <li><kbd>Alt</kbd>+<kbd>F2</kbd> — open (or refresh if already open)</li>
         <li>Or click <strong>Accessible buffer (Alt+F2)</strong> in the toolbar</li>
       </ul>
-      <p>
-        The dialog shows a read-only text area with the current scrollback. Focus moves there so
-        you can use browse mode or the virtual cursor like any other document.
-      </p>
       <h3>While the buffer is open</h3>
       <ul>
         <li><kbd>Escape</kbd> or <strong>Close</strong> — return to the full console and restore focus to xterm</li>
         <li><strong>Refresh snapshot</strong> or <kbd>Alt</kbd>+<kbd>F2</kbd> again — update the text from the live terminal</li>
-        <li><kbd>Alt</kbd>+<kbd>Up</kbd> / <kbd>Alt</kbd>+<kbd>Down</kbd> — move by line and announce the line number and contents</li>
+        <li><strong>Previous line</strong> / <strong>Next line</strong> buttons — move by line and announce the line</li>
+        <li><kbd>Ctrl</kbd>+<kbd>Up</kbd> / <kbd>Ctrl</kbd>+<kbd>Down</kbd> — same as Previous/Next line (preferred; Alt+Arrow is often taken by the desktop or screen reader)</li>
+        <li><kbd>Alt</kbd>+<kbd>P</kbd> / <kbd>Alt</kbd>+<kbd>N</kbd> — previous / next line (alternative)</li>
       </ul>
       <p class="muted">
-        Prefer the <a href="index.html">Accessible terminal</a> for everyday commands and natural language.
-        Use Full console when you need a true TTY (vim, interactive tools), then Alt+F2 to read the result.
+        Prefer Accessible terminal for natural language and simple structured output.
+        Prefer Full console when you need a true Linux/PowerShell TTY, then Alt+F2 to read the result.
       </p>
     </section>
 
     <section class="panel" aria-labelledby="nlsh-heading">
       <h2 id="nlsh-heading">Natural language shell (nlsh) and Ollama</h2>
       <p>
-        When enabled, you can type everyday language in the <strong>Accessible</strong> command box
-        (for example, “Where am I in this path”). The app asks local Ollama for a shell command,
-        shows a confirmation dialog, then runs the command if you accept.
+        When enabled, you can type everyday language in the <strong>Accessible</strong> command box.
+        The app asks local Ollama for a shell command, shows a confirmation dialog, then runs it if you accept.
       </p>
       <h3>Settings: enable and choose a model</h3>
       <ol>
         <li>Open <a href="settings.html">Settings</a>.</li>
-        <li>Under <strong>Natural language shell (nlsh / Ollama)</strong>, check
-          <strong>Enable natural language commands in the web terminal</strong>.</li>
-        <li>Under <strong>Model selection</strong>, open the <strong>Ollama model</strong> list and choose a model
-          (for example <code>llama3.2</code>). Use <strong>Refresh model list</strong> if you just installed a model.</li>
-        <li>Return to the <a href="index.html">Accessible terminal</a> and type natural language or normal shell commands.</li>
+        <li>Enable natural language commands and choose an Ollama model (or pull one).</li>
+        <li>Return to the <a href="index.html">Accessible terminal</a>.</li>
       </ol>
-      <p class="muted">
-        The selected model is stored in this browser. The standalone CLI
-        (<code>npm run nlsh</code>) is separate and uses its own model via <code>.env</code> or <code>!model</code>.
-      </p>
       <h3>Ports</h3>
       <ul>
-        <li><strong>Web app</strong> — port <code>3000</code> (open <code>http://localhost:3000</code>)</li>
-        <li><strong>Ollama</strong> — port <code>11434</code> (the Node server talks to Ollama; the browser does not)</li>
+        <li><strong>Web app</strong> — port <code>3000</code></li>
+        <li><strong>Ollama</strong> — port <code>11434</code></li>
       </ul>
-      <p>These ports do not conflict. You can run both at the same time.</p>
     </section>
 
     <section class="panel" aria-labelledby="setup-heading">
       <h2 id="setup-heading">Where to run the app and Ollama</h2>
-      <p>
-        The shell runs on the same machine as <code>npm run dev</code>.
-        Ollama can be on the same machine or another host. Configure with the
-        <code>OLLAMA_HOST</code> environment variable (default <code>http://127.0.0.1:11434</code>).
-      </p>
-
-      <h3>Option 1 — Everything on Windows (no Linux)</h3>
-      <ol>
-        <li>Install <a href="https://ollama.com">Ollama for Windows</a> and pull a model:</li>
-      </ol>
-      <pre>ollama pull llama3.2</pre>
-      <ol start="2">
-        <li>In the project folder, start the app (defaults are fine):</li>
-      </ol>
-      <pre>npm run dev</pre>
-      <p>Open <code>http://localhost:3000</code>. In Settings, enable nlsh and select your model.</p>
-
-      <h3>Option 2 — Everything on Linux</h3>
+      <p>See Settings for OS-specific install hints. Summary:</p>
       <pre>ollama pull llama3.2
 npm run dev</pre>
-      <p>Open <code>http://localhost:3000</code> (or use VS Code Remote-SSH port forward and open
-      <code>http://localhost:3000</code> on Windows).</p>
-
-      <h3>Option 3 — App on Windows, Ollama on Linux</h3>
-      <p>On <strong>Linux</strong>, let Ollama accept network connections (if needed):</p>
-      <pre>export OLLAMA_HOST=0.0.0.0:11434
-ollama serve</pre>
-      <p>On <strong>Windows</strong>, point the app at the Linux machine (replace the IP):</p>
-      <pre>$env:OLLAMA_HOST = "http://192.168.1.50:11434"
-npm run dev</pre>
-      <p>Or keep Ollama on Linux localhost and tunnel port 11434 with SSH:</p>
-      <pre>ssh -L 11434:127.0.0.1:11434 user@linux-host</pre>
-      <p>Then on Windows use the default (no <code>OLLAMA_HOST</code> needed) and run <code>npm run dev</code>.</p>
-
-      <h3>Standalone natural-language CLI</h3>
-      <p>Optional command-line tool (same Ollama models):</p>
-      <pre>npm run nlsh</pre>
-      <p>Use <code>!model</code> to pick a model, <code>!help</code> for commands, <code>exit</code> to quit.</p>
-      <p>You can also start the CLI from another directory:</p>
-      <pre># Linux / macOS — adjust the path to your clone
-npx --prefix ~/ai_shell/accessible-terminal-app ts-node \
-  ~/ai_shell/accessible-terminal-app/src/nlsh.ts</pre>
+      <p>Open <code>http://localhost:3000</code>. Optional CLI: <code>npm run nlsh</code>.</p>
     </section>
 
     <section class="panel" aria-labelledby="troubleshoot-heading">
       <h2 id="troubleshoot-heading">Troubleshooting</h2>
       <ul>
-        <li><strong>Port 3000 already in use</strong> — stop the old server (<code>fuser -k 3000/tcp</code> on Linux, or end the Node process in Task Manager on Windows), or run
-          <code>PORT=3001 npm run dev</code>.</li>
-        <li><strong>Settings cannot list models</strong> — ensure Ollama is running and reachable from the machine that runs Node; click <strong>Refresh model list</strong>.</li>
-        <li><strong>Natural language does nothing</strong> — use the Accessible terminal (not Full console), enable nlsh in Settings, and select a model.</li>
-        <li><strong>Stuck on “Waiting for shell prompt”</strong> — on Linux the UI should detect bash prompts or enable after a few seconds; refresh the page after updating the app.</li>
-        <li><strong>Full console is hard to read with a screen reader</strong> — press <kbd>Alt</kbd>+<kbd>F2</kbd> for the accessible buffer, or switch to the Accessible terminal for line-oriented work.</li>
+        <li><strong>Port 3000 in use</strong> — stop the old process or use <code>PORT=3001 npm run dev</code>.</li>
+        <li><strong>No models</strong> — install Ollama, pull a model, then Refresh on Settings.</li>
+        <li><strong>Alt+Up/Down does nothing in the buffer</strong> — use <kbd>Ctrl</kbd>+<kbd>Up</kbd>/<kbd>Down</kbd> or the Previous/Next line buttons.</li>
+        <li><strong>Full console hard to read</strong> — press <kbd>Alt</kbd>+<kbd>F2</kbd> for the accessible buffer.</li>
       </ul>
     </section>
   </main>
