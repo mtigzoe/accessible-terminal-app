@@ -10,6 +10,8 @@
     "nlsh": "ts-node src/nlsh.ts"
   },
   "dependencies": {
+    "electron": "^43.3.0",
+    "electron-builder": "^26.15.3",
     "express": "^4.19.2",
     "node-pty": "^1.0.0",
     "ws": "^8.17.0"
