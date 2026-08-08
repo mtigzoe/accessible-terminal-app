@@ -128,56 +128,44 @@ Place platform icons in an `assets/` directory:
 
 ## Ollama on Windows or Linux
 
-The Electron app can run on Windows while using an Ollama server running either on Windows or on another computer such as your Linux machine. The backend already reads the `OLLAMA_HOST` environment variable.
-
-### Windows Ollama
-
-Use the normal development command:
-
-```powershell
-npm run electron:dev
-```
-
-By default, Ollama is expected at:
-
-```text
-http://127.0.0.1:11434
-```
-
-### Linux Ollama from Windows Electron
-
-If Ollama is running on your Linux computer, start the Electron app with `OLLAMA_HOST` pointing to the Linux Ollama server.
-
-For example, in PowerShell:
-
-```powershell
-$env:OLLAMA_HOST="http://cyber.local:11434"
-npm run electron:dev
-```
-
-The server must be reachable from Windows, and Ollama must be configured on Linux to accept connections from the Windows computer. Keep the Ollama port restricted to your trusted network rather than exposing it to the public Internet.
+The Electron app can run on Windows while using an Ollama server running either on Windows or on another computer such as your Linux machine. The backend reads the `OLLAMA_HOST` environment variable.
 
 ### Easy Windows launcher
 
-To choose Windows Ollama, Linux Ollama, or another Ollama server interactively:
+The recommended Windows launcher defaults to your Linux Ollama server and no longer asks you to choose a hostname every time:
 
 ```powershell
 .\scripts\start-electron.ps1
 ```
 
-The launcher presents three choices:
+By default, it uses:
 
-1. Ollama on Windows: `http://127.0.0.1:11434`
-2. Ollama on Linux: `http://cyber.local:11434`
-3. Enter a different Ollama URL
+```text
+http://cyber.local:11434
+```
 
-You can also provide a different default Linux host:
+You can override the Linux Ollama host when needed:
 
 ```powershell
 .\scripts\start-electron.ps1 -LinuxOllamaHost "http://192.168.1.50:11434"
 ```
 
 The launcher only sets `OLLAMA_HOST` for the Electron process. It does not install, start, stop, or move Ollama models.
+
+### Windows Ollama
+
+If you want to use Ollama installed on Windows instead, set the environment variable before starting Electron:
+
+```powershell
+$env:OLLAMA_HOST="http://127.0.0.1:11434"
+npm run electron:dev
+```
+
+### Linux Ollama from Windows Electron
+
+When the Electron app runs on Windows and Ollama runs on Linux, the Windows app sends requests to the Linux Ollama server. The model remains on Linux.
+
+The Linux Ollama server must be reachable from Windows and configured to accept connections from the Windows computer. Keep the Ollama port restricted to your trusted network rather than exposing it to the public Internet.
 
 ### Choosing the model
 
@@ -218,40 +206,3 @@ With **Settings → Enable natural language commands** and an Ollama model selec
 cd /path/to/accessible-terminal-app
 npm run nlsh
 ```
-
-Requires Ollama running (default `http://127.0.0.1:11434`). Use `!model` to pick a model, `!help` for commands, `exit` to quit.
-
-### CLI from another directory
-
-You can start the same tool from any working directory without `cd` into the repo first:
-
-```bash
-# from anywhere — adjust the path to where you cloned this project
-npx --prefix ~/ai_shell/accessible-terminal-app ts-node \
-  ~/ai_shell/accessible-terminal-app/src/nlsh.ts
-```
-
-On Windows (PowerShell), for example:
-
-```powershell
-npx --prefix $HOME\ai_shell\accessible-terminal-app ts-node `
-  $HOME\ai_shell\accessible-terminal-app\src\nlsh.ts
-```
-
-Optional: add a shell alias that points at that command so you can type `nlsh` from any folder.
-
-The CLI’s working directory is wherever you started it; you can still `cd` to other paths after it launches. The web app’s nlsh feature is separate: keep `npm run dev` running from the repo, then use natural language in the browser from any path in the shell.
-
-## How it works
-
-- The server spawns `pwsh` (or `$SHELL` / bash on non-Windows) per WebSocket connection, starting in your home folder.
-- The page sends one full command line at a time when you press Enter.
-- Shell output is cleaned of ANSI escape codes and shown as plain text in the output box.
-- The current path is taken from the PowerShell prompt (`PS C:\…>`) or a bash/zsh-style prompt on Linux/macOS.
-- Optional shell integration (`shell-integration/pwsh-integration.ps1`) emits OSC 633 markers so the UI can announce success vs failure more reliably.
-
-Interactive full-screen programs (editors, pagers) are not the goal of this simple form UI — line-oriented shell commands are. Use **Full console** mode for vim and similar tools.
-
-## Security note
-
-There is no authentication. Anyone who can reach the server gets a real shell on the host. Keep it on localhost unless you add proper access control.
