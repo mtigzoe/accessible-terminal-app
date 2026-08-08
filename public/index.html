@@ -111,6 +111,11 @@
   #structured-content .global-actions { display: flex; flex-wrap: wrap; gap: 8px; }
   #structured-content button.danger { border-color: var(--error); color: var(--error); }
   #structured-content .empty-note { color: var(--muted); margin: 0; }
+
+  #editor-panel[hidden] { display: none; }
+  #editor-status { margin: 0 0 10px; color: var(--muted); }
+  #editor-textarea { display: block; width: 100%; min-height: 200px; height: 32vh; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; font-family: Consolas, "Courier New", monospace; line-height: 1.35; padding: 10px; resize: vertical; white-space: pre; overflow-wrap: normal; overflow-x: auto; margin-bottom: 10px; }
+  #editor-textarea:focus { outline: 2px solid var(--focus); outline-offset: 2px; }
 </style>
 </head>
 <body>
@@ -131,6 +136,17 @@
     <section class="panel" id="structured-panel" hidden aria-labelledby="structured-heading">
       <h2 id="structured-heading">Structured results</h2>
       <div id="structured-content"></div>
+    </section>
+
+    <section class="panel" id="editor-panel" hidden aria-labelledby="editor-heading">
+      <h2 id="editor-heading">File editor</h2>
+      <p id="editor-status" aria-live="polite"></p>
+      <label for="editor-textarea" class="visually-hidden">File contents</label>
+      <textarea id="editor-textarea" spellcheck="false"></textarea>
+      <div class="actions">
+        <button type="button" id="editor-save-btn" class="primary">Save (Ctrl+S)</button>
+        <button type="button" id="editor-cancel-btn">Cancel (Escape)</button>
+      </div>
     </section>
 
     <section class="panel" aria-labelledby="output-heading">

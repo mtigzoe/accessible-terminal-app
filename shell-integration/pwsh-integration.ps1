@@ -21,6 +21,12 @@ function prompt {
     $marker = "$esc]633;D;$(if ($exitOk) { 0 } else { 1 })$bel"
     # 633;A - a new prompt is starting here.
     $marker += "$esc]633;A$bel"
+    # 633;P;Cwd=... - explicit current directory. Sent as its own marker
+    # (rather than relying on matchPrompt() regexing it back out of the
+    # visible "PS <path>>" text) because local echo of the command just
+    # run can land on the same terminal line as the next prompt, so an
+    # isolated, cleanly-matchable prompt line isn't guaranteed every time.
+    $marker += "$esc]633;P;Cwd=$($executionContext.SessionState.Path.CurrentLocation)$bel"
 
     Write-Host -NoNewline $marker
 

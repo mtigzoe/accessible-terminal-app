@@ -36,6 +36,134 @@ npm run build
 npm start
 ```
 
+## Desktop application (Electron)
+
+The same accessible UI can also run as a standalone desktop application. The Electron main process is `src/electron/main.ts`, and the preload bridge is `src/electron/preload.ts`.
+
+### Electron development
+
+Run:
+
+```bash
+npm run electron:dev
+```
+
+The Electron development command first compiles the TypeScript sources with `tsc` and then launches Electron using the compiled entry point configured by the `main` field in `package.json`.
+
+On Windows, you can run `npm run electron:dev` directly from PowerShell. The Electron window will appear on the Windows desktop.
+
+The original browser workflow remains available with `npm run dev`.
+
+### Linux Electron launcher
+
+On Linux, the recommended launcher is:
+
+```bash
+./scripts/start-electron.sh
+```
+
+It defaults to a local Ollama server at:
+
+```text
+http://127.0.0.1:11434
+```
+
+You can specify another Ollama server without editing the script:
+
+```bash
+./scripts/start-electron.sh http://192.168.1.50:11434
+```
+
+The launcher sets `OLLAMA_HOST` for the Electron process and then runs `npm run electron:dev`.
+
+### Test the compiled Electron application locally
+
+```bash
+npm run electron
+```
+
+### Build a directory package
+
+```bash
+npm run pack
+```
+
+### Build distributables
+
+```bash
+npm run dist
+```
+
+This creates platform-specific distributables in `release/`:
+
+- Windows: NSIS installer (`.exe`)
+- macOS: DMG (`.dmg`)
+- Linux: AppImage (`.AppImage`)
+
+## Ollama on Windows or Linux
+
+The Electron app can run on Windows or Linux while using an Ollama server on the same computer or on another computer. The backend reads the `OLLAMA_HOST` environment variable, and the Settings page also lets you change the Ollama server without editing scripts.
+
+### Windows launcher
+
+```powershell
+.\scripts\start-electron.ps1
+```
+
+The Windows launcher defaults to:
+
+```text
+http://cyber.local:11434
+```
+
+You can override it when needed:
+
+```powershell
+.\scripts\start-electron.ps1 -LinuxOllamaHost "http://192.168.1.50:11434"
+```
+
+### Linux launcher
+
+```bash
+./scripts/start-electron.sh
+```
+
+The Linux launcher defaults to:
+
+```text
+http://127.0.0.1:11434
+```
+
+To use Ollama on another computer:
+
+```bash
+./scripts/start-electron.sh http://192.168.1.50:11434
+```
+
+### Change the Ollama server from Settings
+
+You do not have to edit either launcher to change servers permanently for the application UI. Open:
+
+**Settings → Natural language shell (nlsh / Ollama)**
+
+Enter the Ollama server address and choose **Connect**. The application tests the connection before switching to it, then refreshes the available models. This setting is saved for the application.
+
+For example:
+
+```text
+http://cyber.local:11434
+http://192.168.1.50:11434
+http://127.0.0.1:11434
+```
+
+When Windows Electron connects to Linux Ollama, the model remains on Linux. The Windows application communicates with the Linux Ollama HTTP API.
+
+The remote Ollama server must be reachable from the computer running Electron and should be restricted to a trusted network rather than exposed to the public Internet.
+
+### Choosing and managing models
+
+Open **Settings → Natural language shell (nlsh / Ollama)**. The application can list installed models, install supported models, remove models, and select the model used for natural-language commands. No `ollama pull` command is required for normal model management.
+
 ## How to use (screen reader)
 
 1. When the page loads, wait for “Shell ready” / “Connected to PowerShell.”
@@ -69,40 +197,3 @@ With **Settings → Enable natural language commands** and an Ollama model selec
 cd /path/to/accessible-terminal-app
 npm run nlsh
 ```
-
-Requires Ollama running (default `http://127.0.0.1:11434`). Use `!model` to pick a model, `!help` for commands, `exit` to quit.
-
-### CLI from another directory
-
-You can start the same tool from any working directory without `cd` into the repo first:
-
-```bash
-# from anywhere — adjust the path to where you cloned this project
-npx --prefix ~/ai_shell/accessible-terminal-app ts-node \
-  ~/ai_shell/accessible-terminal-app/src/nlsh.ts
-```
-
-On Windows (PowerShell), for example:
-
-```powershell
-npx --prefix $HOME\ai_shell\accessible-terminal-app ts-node `
-  $HOME\ai_shell\accessible-terminal-app\src\nlsh.ts
-```
-
-Optional: add a shell alias that points at that command so you can type `nlsh` from any folder.
-
-The CLI’s working directory is wherever you started it; you can still `cd` to other paths after it launches. The web app’s nlsh feature is separate: keep `npm run dev` running from the repo, then use natural language in the browser from any path in the shell.
-
-## How it works
-
-- The server spawns `pwsh` (or `$SHELL` / bash on non-Windows) per WebSocket connection, starting in your home folder.
-- The page sends one full command line at a time when you press Enter.
-- Shell output is cleaned of ANSI escape codes and shown as plain text in the output box.
-- The current path is taken from the PowerShell prompt (`PS C:\…>`) or a bash/zsh-style prompt on Linux/macOS.
-- Optional shell integration (`shell-integration/pwsh-integration.ps1`) emits OSC 633 markers so the UI can announce success vs failure more reliably.
-
-Interactive full-screen programs (editors, pagers) are not the goal of this simple form UI — line-oriented shell commands are. Use **Full console** mode for vim and similar tools.
-
-## Security note
-
-There is no authentication. Anyone who can reach the server gets a real shell on the host. Keep it on localhost unless you add proper access control.
