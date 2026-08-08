@@ -18,6 +18,7 @@ Backend is TypeScript (`src/server.ts`); frontend is plain HTML/JS (`public/inde
   - **macOS**: Xcode Command Line Tools (`xcode-select --install`)
   - **Linux**: `build-essential` and `python3`
 - On Windows, **PowerShell 7** (`pwsh`) on `PATH`
+- Optional: [Ollama](https://ollama.com) for natural-language commands (nlsh)
 
 ## Setup
 
@@ -58,15 +59,49 @@ npm start
 
 Tab stays in the command field — it does not move focus to the Run button. Completions use your **current path** so `cd per` + Tab can expand to a folder under that directory.
 
+## Natural language shell (nlsh / Ollama)
+
+With **Settings → Enable natural language commands** and an Ollama model selected, the **Accessible terminal** can turn everyday language into a shell command (after confirmation). The shell can `cd` anywhere; you do not need to stay inside this repository.
+
+### Standalone CLI inside the repo
+
+```bash
+cd /path/to/accessible-terminal-app
+npm run nlsh
+```
+
+Requires Ollama running (default `http://127.0.0.1:11434`). Use `!model` to pick a model, `!help` for commands, `exit` to quit.
+
+### CLI from another directory
+
+You can start the same tool from any working directory without `cd` into the repo first:
+
+```bash
+# from anywhere — adjust the path to where you cloned this project
+npx --prefix ~/ai_shell/accessible-terminal-app ts-node \
+  ~/ai_shell/accessible-terminal-app/src/nlsh.ts
+```
+
+On Windows (PowerShell), for example:
+
+```powershell
+npx --prefix $HOME\ai_shell\accessible-terminal-app ts-node `
+  $HOME\ai_shell\accessible-terminal-app\src\nlsh.ts
+```
+
+Optional: add a shell alias that points at that command so you can type `nlsh` from any folder.
+
+The CLI’s working directory is wherever you started it; you can still `cd` to other paths after it launches. The web app’s nlsh feature is separate: keep `npm run dev` running from the repo, then use natural language in the browser from any path in the shell.
+
 ## How it works
 
 - The server spawns `pwsh` (or `$SHELL` / bash on non-Windows) per WebSocket connection, starting in your home folder.
 - The page sends one full command line at a time when you press Enter.
 - Shell output is cleaned of ANSI escape codes and shown as plain text in the output box.
-- The current path is taken from the PowerShell prompt (`PS C:\…>`).
+- The current path is taken from the PowerShell prompt (`PS C:\…>`) or a bash/zsh-style prompt on Linux/macOS.
 - Optional shell integration (`shell-integration/pwsh-integration.ps1`) emits OSC 633 markers so the UI can announce success vs failure more reliably.
 
-Interactive full-screen programs (editors, pagers) are not the goal of this simple form UI — line-oriented PowerShell commands are.
+Interactive full-screen programs (editors, pagers) are not the goal of this simple form UI — line-oriented shell commands are. Use **Full console** mode for vim and similar tools.
 
 ## Security note
 

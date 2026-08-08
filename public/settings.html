@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Settings — Accessible PowerShell</title>
+<title>Settings — Accessible terminal</title>
 <script>
 (function () {
   try {
@@ -16,228 +16,187 @@
 </script>
 <style>
   :root {
-    --bg: #0c0c0c;
-    --panel: #161616;
-    --text: #e6e6e6;
-    --muted: #a0a0a0;
-    --accent: #4fc1e9;
-    --border: #333;
-    --focus: #4fc1e9;
+    --bg: #0c0c0c; --panel: #161616; --text: #e6e6e6; --muted: #a0a0a0;
+    --accent: #4fc1e9; --border: #333; --focus: #4fc1e9; --error: #f48771; --ok: #89d185;
   }
-
   html[data-high-contrast="true"] {
-    --bg: #000000;
-    --panel: #000000;
-    --text: #ffffff;
-    --muted: #ffffff;
-    --accent: #ffff00;
-    --border: #ffffff;
-    --focus: #ffff00;
+    --bg: #000; --panel: #000; --text: #fff; --muted: #fff;
+    --accent: #ffff00; --border: #fff; --focus: #ffff00; --error: #ff6b6b; --ok: #00ff00;
   }
-
   html[data-font-size="small"] { font-size: 14px; }
   html[data-font-size="medium"] { font-size: 16px; }
   html[data-font-size="large"] { font-size: 18px; }
   html[data-font-size="x-large"] { font-size: 22px; }
-
   * { box-sizing: border-box; }
-
   body {
-    margin: 0;
-    padding: 24px;
-    padding-top: 64px;
-    background: var(--panel);
-    color: var(--text);
-    font-family: "Segoe UI", system-ui, sans-serif;
-    line-height: 1.5;
-    max-width: 40rem;
+    margin: 0; padding: 24px; padding-top: 64px; background: var(--panel); color: var(--text);
+    font-family: "Segoe UI", system-ui, sans-serif; line-height: 1.5; max-width: 40rem;
   }
-
-  .app-menu {
-    position: fixed;
-    top: 12px;
-    left: 12px;
-    z-index: 100;
-  }
-
+  .app-menu { position: fixed; top: 12px; left: 12px; z-index: 100; }
   .menu-toggle {
-    background: #2a2a2a;
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 8px 14px;
-    cursor: pointer;
-    font-size: 0.95rem;
-    font-family: inherit;
+    background: #2a2a2a; color: var(--text); border: 1px solid var(--border); border-radius: 4px;
+    padding: 8px 14px; cursor: pointer; font-size: 0.95rem; font-family: inherit;
   }
-
-  html[data-high-contrast="true"] .menu-toggle {
-    background: #000;
-  }
-
+  html[data-high-contrast="true"] .menu-toggle { background: #000; }
   .menu-toggle:hover { border-color: var(--accent); }
-  .menu-toggle:focus {
-    outline: 2px solid var(--focus);
-    outline-offset: 2px;
-  }
+  .menu-toggle:focus { outline: 2px solid var(--focus); outline-offset: 2px; }
   .menu-toggle[aria-expanded="true"] { border-color: var(--accent); }
-
   .menu-panel {
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    margin: 4px 0 0;
-    min-width: 12rem;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 6px 0;
-    list-style: none;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+    display: none; position: absolute; top: 100%; left: 0; margin: 4px 0 0; min-width: 12rem;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 0;
+    list-style: none; box-shadow: 0 6px 20px rgba(0,0,0,0.45);
   }
-
   .menu-panel[data-open="true"] { display: block; }
-
-  .menu-panel a {
-    display: block;
-    padding: 8px 14px;
-    color: var(--text);
-    text-decoration: none;
-    font-size: 0.95rem;
-  }
-
-  .menu-panel a:hover,
-  .menu-panel a:focus {
-    background: #1e4d6b;
-    outline: none;
-  }
-
+  .menu-panel a { display: block; padding: 8px 14px; color: var(--text); text-decoration: none; font-size: 0.95rem; }
+  .menu-panel a:hover, .menu-panel a:focus { background: #1e4d6b; outline: none; }
   html[data-high-contrast="true"] .menu-panel a:hover,
-  html[data-high-contrast="true"] .menu-panel a:focus {
-    background: #333;
-    color: #ffff00;
-  }
-
-  h1 {
-    font-size: 1.35rem;
-    font-weight: 600;
-    margin: 0 0 8px;
-  }
-
-  h2 {
-    font-size: 1.05rem;
-    font-weight: 600;
-    margin: 0 0 0.75rem;
-    color: var(--accent);
-  }
-
+  html[data-high-contrast="true"] .menu-panel a:focus { background: #333; color: #ffff00; }
+  h1 { font-size: 1.35rem; font-weight: 600; margin: 0 0 8px; }
+  h2 { font-size: 1.05rem; font-weight: 600; margin: 0 0 0.75rem; color: var(--accent); }
+  h3 { font-size: 1rem; font-weight: 600; margin: 0 0 0.5rem; }
   .muted { color: var(--muted); }
-
-  .panel {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 14px 16px;
-    margin: 1rem 0;
+  .ok { color: var(--ok); }
+  .err { color: var(--error); }
+  .panel { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; margin: 1rem 0; }
+  fieldset { border: none; margin: 0; padding: 0; }
+  legend { font-weight: 600; margin-bottom: 0.5rem; padding: 0; }
+  .setting-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.25rem; margin-top: 0.5rem; }
+  label.option { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+  input[type="checkbox"], input[type="radio"] { width: 1.1rem; height: 1.1rem; accent-color: var(--accent); }
+  input:focus, select:focus, button:focus { outline: 2px solid var(--focus); outline-offset: 2px; }
+  select {
+    background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px;
+    padding: 8px 10px; font-size: 1rem; font-family: inherit; min-width: 14rem; max-width: 100%;
   }
-
-  fieldset {
-    border: none;
-    margin: 0;
-    padding: 0;
+  input[type="text"] {
+    background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px;
+    padding: 8px 10px; font-size: 1rem; font-family: inherit; min-width: 12rem; max-width: 100%;
   }
-
-  legend {
-    font-weight: 600;
-    margin-bottom: 0.5rem;
-    padding: 0;
+  button.secondary {
+    background: #2a2a2a; color: var(--text); border: 1px solid var(--border); border-radius: 4px;
+    padding: 8px 12px; cursor: pointer; font-size: 0.95rem; font-family: inherit;
   }
-
-  .setting-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.75rem 1.25rem;
-    margin-top: 0.5rem;
+  html[data-high-contrast="true"] button.secondary { background: #000; }
+  button.secondary:hover { border-color: var(--accent); }
+  button.primary {
+    background: #1e4d6b; color: var(--text); border: 1px solid #2a6a90; border-radius: 4px;
+    padding: 8px 12px; cursor: pointer; font-size: 0.95rem; font-family: inherit;
   }
-
-  label.option {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    cursor: pointer;
+  html[data-high-contrast="true"] button.primary {
+    background: #000; border-color: #ffff00; color: #ffff00;
   }
-
-  input[type="checkbox"],
-  input[type="radio"] {
-    width: 1.1rem;
-    height: 1.1rem;
-    accent-color: var(--accent);
-  }
-
-  input:focus {
-    outline: 2px solid var(--focus);
-    outline-offset: 2px;
-  }
-
-  a.back {
-    color: var(--accent);
-  }
-
-  a.back:focus {
-    outline: 2px solid var(--focus);
-    outline-offset: 2px;
-  }
-
+  button:disabled { opacity: 0.55; cursor: not-allowed; }
+  a.back { color: var(--accent); }
+  a.back:focus { outline: 2px solid var(--focus); outline-offset: 2px; }
   .visually-hidden {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0,0,0,0); white-space: nowrap; border: 0;
   }
+  #ollama-status, #pull-status { margin: 0.5rem 0 0; font-size: 0.95rem; }
+  pre.setup-cmd {
+    background: #111; border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px;
+    overflow-x: auto; white-space: pre-wrap; word-break: break-word; margin: 0.5rem 0 0;
+    font-family: Consolas, "Courier New", monospace; font-size: 0.9rem;
+  }
+  html[data-high-contrast="true"] pre.setup-cmd { background: #000; }
+  #setup-hints ul { margin: 0.4rem 0 0; padding-left: 1.25rem; }
+  code { font-family: Consolas, "Courier New", monospace; font-size: 0.92em; }
 </style>
 </head>
 <body>
   <nav class="app-menu" aria-label="Main menu">
-    <button
-      type="button"
-      class="menu-toggle"
-      id="menu-toggle"
-      aria-expanded="false"
-      aria-controls="menu-panel"
-      aria-haspopup="menu">
-      Menu
-    </button>
+    <button type="button" class="menu-toggle" id="menu-toggle" aria-expanded="false" aria-controls="menu-panel" aria-haspopup="menu">Menu</button>
     <ul class="menu-panel" id="menu-panel" role="menu" data-open="false">
-      <li role="none">
-        <a role="menuitem" href="index.html" tabindex="-1">Terminal</a>
-      </li>
-      <li role="none">
-        <a role="menuitem" href="instructions.html" tabindex="-1">Instructions</a>
-      </li>
-      <li role="none">
-        <a role="menuitem" href="settings.html" aria-current="page" tabindex="-1">Settings</a>
-      </li>
+      <li role="none"><a role="menuitem" href="index.html" tabindex="-1">Terminal</a></li>
+      <li role="none"><a role="menuitem" href="instructions.html" tabindex="-1">Instructions</a></li>
+      <li role="none"><a role="menuitem" href="settings.html" aria-current="page" tabindex="-1">Settings</a></li>
     </ul>
   </nav>
 
   <header>
     <h1>Settings</h1>
-    <p class="muted">Display preferences are saved in this browser and apply to all pages.</p>
+    <p class="muted">Preferences are saved in this browser. See setup hints below for Ollama on this machine.</p>
   </header>
 
   <main>
-    <p>
-      <a class="back" href="index.html">← Back to terminal</a>
-    </p>
+    <p><a class="back" href="index.html">← Back to terminal</a></p>
 
     <form id="settings-form">
+      <section class="panel" aria-labelledby="mode-heading">
+        <h2 id="mode-heading">Console mode</h2>
+        <fieldset>
+          <legend class="visually-hidden">Console mode</legend>
+          <div class="setting-row" role="radiogroup" aria-labelledby="mode-heading">
+            <label class="option"><input type="radio" name="console-mode" value="accessible" checked> Accessible (path, output, command box)</label>
+            <label class="option"><input type="radio" name="console-mode" value="full"> Full console (xterm — vim, menus, Ctrl+C in-shell)</label>
+          </div>
+        </fieldset>
+        <p class="muted" style="margin: 0.75rem 0 0; font-size: 0.95rem;">
+          Accessible mode is best with screen readers and natural language. Full console is a real terminal grid.
+        </p>
+      </section>
+
+      <section class="panel" aria-labelledby="nlsh-heading">
+        <h2 id="nlsh-heading">Natural language shell (nlsh / Ollama)</h2>
+        <div class="setting-row">
+          <label class="option" for="nlsh-enabled">
+            <input type="checkbox" id="nlsh-enabled" name="nlsh-enabled">
+            Enable natural language commands in the web terminal
+          </label>
+        </div>
+        <p class="muted" style="margin: 0.75rem 0 0; font-size: 0.95rem;">
+          When enabled, everyday language in the Accessible command box is translated via Ollama (after confirmation).
+        </p>
+
+        <div id="model-section" style="margin-top: 1rem;">
+          <h3 id="model-heading">Model selection</h3>
+          <p class="muted" style="margin: 0 0 0.5rem; font-size: 0.95rem;">
+            Choose which Ollama model to use for translation.
+          </p>
+          <div class="setting-row">
+            <label for="ollama-model" class="option" style="flex-direction: column; align-items: flex-start; gap: 0.35rem;">
+              <span>Ollama model</span>
+              <select id="ollama-model" name="ollama-model" aria-describedby="ollama-status model-heading">
+                <option value="">Loading models…</option>
+              </select>
+            </label>
+            <button type="button" class="secondary" id="refresh-models">Refresh model list</button>
+          </div>
+          <p id="ollama-status" class="muted" role="status" aria-live="polite">Checking Ollama…</p>
+
+          <div id="pull-section" style="margin-top: 1.25rem;">
+            <h3 id="pull-heading">Pull a model</h3>
+            <p class="muted" style="margin: 0 0 0.5rem; font-size: 0.95rem;">
+              Downloads a model with the local <code>ollama pull</code> command (Ollama must already be installed).
+              Large models can take several minutes.
+            </p>
+            <div class="setting-row">
+              <label for="pull-model-name" class="option" style="flex-direction: column; align-items: flex-start; gap: 0.35rem;">
+                <span>Model name</span>
+                <input type="text" id="pull-model-name" name="pull-model-name" placeholder="llama3.2" autocomplete="off" spellcheck="false" aria-describedby="pull-heading pull-status">
+              </label>
+              <button type="button" class="primary" id="pull-model-btn">Pull model</button>
+            </div>
+            <p id="pull-status" class="muted" role="status" aria-live="polite"></p>
+          </div>
+
+          <div id="setup-hints" style="margin-top: 1.25rem;" aria-labelledby="setup-heading">
+            <h3 id="setup-heading">If Ollama is not installed</h3>
+            <p class="muted" style="margin: 0 0 0.5rem; font-size: 0.95rem;">
+              This app does not install Ollama automatically (for security). Use the official download or the commands for this machine, then refresh the model list.
+            </p>
+            <p id="setup-title" style="margin: 0.5rem 0 0; font-weight: 600;"></p>
+            <ul id="setup-steps"></ul>
+            <pre class="setup-cmd" id="setup-commands" hidden></pre>
+            <p style="margin: 0.75rem 0 0;">
+              <a id="setup-download" href="https://ollama.com/download" target="_blank" rel="noopener noreferrer">Open ollama.com/download</a>
+              ·
+              <a href="instructions.html">Full setup instructions</a>
+            </p>
+          </div>
+        </div>
+      </section>
+
       <section class="panel" aria-labelledby="contrast-heading">
         <h2 id="contrast-heading">High contrast</h2>
         <div class="setting-row">
@@ -246,9 +205,6 @@
             Use high contrast colours
           </label>
         </div>
-        <p class="muted" style="margin: 0.75rem 0 0; font-size: 0.95rem;">
-          Black background, white text, and yellow accents for stronger contrast.
-        </p>
       </section>
 
       <section class="panel" aria-labelledby="font-heading">
@@ -256,22 +212,10 @@
         <fieldset>
           <legend class="visually-hidden">Font size</legend>
           <div class="setting-row" role="radiogroup" aria-labelledby="font-heading">
-            <label class="option">
-              <input type="radio" name="font-size" value="small">
-              Small
-            </label>
-            <label class="option">
-              <input type="radio" name="font-size" value="medium" checked>
-              Medium
-            </label>
-            <label class="option">
-              <input type="radio" name="font-size" value="large">
-              Large
-            </label>
-            <label class="option">
-              <input type="radio" name="font-size" value="x-large">
-              Extra large
-            </label>
+            <label class="option"><input type="radio" name="font-size" value="small"> Small</label>
+            <label class="option"><input type="radio" name="font-size" value="medium" checked> Medium</label>
+            <label class="option"><input type="radio" name="font-size" value="large"> Large</label>
+            <label class="option"><input type="radio" name="font-size" value="x-large"> Extra large</label>
           </div>
         </fieldset>
       </section>
@@ -282,115 +226,57 @@
 
 <script>
 (function () {
-  // --- Menu ---
   const menuToggle = document.getElementById('menu-toggle');
   const menuPanel = document.getElementById('menu-panel');
-  const menuItems = Array.prototype.slice.call(
-    menuPanel.querySelectorAll('[role="menuitem"]')
-  );
-
-  function isMenuOpen() {
-    return menuToggle.getAttribute('aria-expanded') === 'true';
-  }
-
-  function setMenuOpen(open, focusItemIndex) {
+  const menuItems = Array.prototype.slice.call(menuPanel.querySelectorAll('[role="menuitem"]'));
+  function isMenuOpen() { return menuToggle.getAttribute('aria-expanded') === 'true'; }
+  function setMenuOpen(open, i) {
     menuToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     menuPanel.dataset.open = open ? 'true' : 'false';
-    if (open) {
-      const index =
-        typeof focusItemIndex === 'number' && focusItemIndex >= 0
-          ? focusItemIndex
-          : 0;
-      if (menuItems[index]) {
-        menuItems[index].focus();
-      }
-    } else {
-      menuToggle.focus();
-    }
+    if (open && menuItems[i || 0]) menuItems[i || 0].focus();
+    else menuToggle.focus();
   }
-
-  function focusMenuItem(index) {
-    if (!menuItems.length) return;
-    const n = menuItems.length;
-    const i = ((index % n) + n) % n;
-    menuItems[i].focus();
-  }
-
-  function currentMenuIndex() {
-    return menuItems.indexOf(document.activeElement);
-  }
-
-  menuToggle.addEventListener('click', function () {
-    if (isMenuOpen()) setMenuOpen(false);
-    else setMenuOpen(true, 0);
+  menuToggle.addEventListener('click', function () { setMenuOpen(!isMenuOpen(), 0); });
+  menuToggle.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMenuOpen(true, 0); }
   });
-
-  menuToggle.addEventListener('keydown', function (event) {
-    if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      setMenuOpen(true, 0);
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      setMenuOpen(true, menuItems.length - 1);
-    }
-  });
-
-  menuPanel.addEventListener('keydown', function (event) {
+  menuPanel.addEventListener('keydown', function (e) {
     if (!isMenuOpen()) return;
-    const idx = currentMenuIndex();
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      focusMenuItem(idx < 0 ? 0 : idx + 1);
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      focusMenuItem(idx < 0 ? menuItems.length - 1 : idx - 1);
-    } else if (event.key === 'Home') {
-      event.preventDefault();
-      focusMenuItem(0);
-    } else if (event.key === 'End') {
-      event.preventDefault();
-      focusMenuItem(menuItems.length - 1);
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      setMenuOpen(false);
-    } else if (event.key === 'Tab') {
-      setMenuOpen(false);
+    const idx = menuItems.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') { e.preventDefault(); menuItems[(idx + 1) % menuItems.length].focus(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); menuItems[(idx - 1 + menuItems.length) % menuItems.length].focus(); }
+    else if (e.key === 'Escape') { e.preventDefault(); setMenuOpen(false); }
+  });
+  document.addEventListener('click', function (e) {
+    if (!menuToggle.contains(e.target) && !menuPanel.contains(e.target) && isMenuOpen()) {
+      menuToggle.setAttribute('aria-expanded', 'false');
+      menuPanel.dataset.open = 'false';
     }
   });
 
-  document.addEventListener('click', function (event) {
-    if (!menuToggle.contains(event.target) && !menuPanel.contains(event.target)) {
-      if (isMenuOpen()) {
-        menuToggle.setAttribute('aria-expanded', 'false');
-        menuPanel.dataset.open = 'false';
-      }
-    }
-  });
-
-  document.addEventListener('keydown', function (event) {
-    if (event.key === 'Escape' && isMenuOpen()) {
-      event.preventDefault();
-      setMenuOpen(false);
-    }
-  });
-
-  // --- Settings ---
   const highContrastEl = document.getElementById('high-contrast');
   const fontRadios = document.querySelectorAll('input[name="font-size"]');
+  const modeRadios = document.querySelectorAll('input[name="console-mode"]');
+  const nlshEnabledEl = document.getElementById('nlsh-enabled');
+  const modelSelect = document.getElementById('ollama-model');
+  const ollamaStatus = document.getElementById('ollama-status');
+  const refreshModelsBtn = document.getElementById('refresh-models');
+  const pullModelInput = document.getElementById('pull-model-name');
+  const pullModelBtn = document.getElementById('pull-model-btn');
+  const pullStatus = document.getElementById('pull-status');
+  const setupTitle = document.getElementById('setup-title');
+  const setupSteps = document.getElementById('setup-steps');
+  const setupCommands = document.getElementById('setup-commands');
+  const setupDownload = document.getElementById('setup-download');
   const srStatus = document.getElementById('sr-status');
 
   function announce(text) {
     srStatus.textContent = '';
-    window.setTimeout(function () {
-      srStatus.textContent = text;
-    }, 80);
+    window.setTimeout(function () { srStatus.textContent = text; }, 80);
   }
 
   function applyToDocument(highContrast, fontSize) {
-    document.documentElement.setAttribute(
-      'data-high-contrast',
-      highContrast ? 'true' : 'false'
-    );
+    document.documentElement.setAttribute('data-high-contrast', highContrast ? 'true' : 'false');
     document.documentElement.setAttribute('data-font-size', fontSize);
   }
 
@@ -403,20 +289,20 @@
   }
 
   function loadSettings() {
-    var hc = false;
-    var fs = 'medium';
+    var hc = false, fs = 'medium', mode = 'accessible', nlsh = false, model = '';
     try {
       hc = localStorage.getItem('terminal-high-contrast') === 'true';
       var saved = localStorage.getItem('terminal-font-size');
-      if (saved === 'small' || saved === 'medium' || saved === 'large' || saved === 'x-large') {
-        fs = saved;
-      }
+      if (saved === 'small' || saved === 'medium' || saved === 'large' || saved === 'x-large') fs = saved;
+      if (localStorage.getItem('terminal-console-mode') === 'full') mode = 'full';
+      nlsh = localStorage.getItem('terminal-nlsh-enabled') === 'true';
+      model = localStorage.getItem('terminal-ollama-model') || '';
     } catch (e) {}
-
     highContrastEl.checked = hc;
-    fontRadios.forEach(function (radio) {
-      radio.checked = radio.value === fs;
-    });
+    fontRadios.forEach(function (r) { r.checked = r.value === fs; });
+    modeRadios.forEach(function (r) { r.checked = r.value === mode; });
+    nlshEnabledEl.checked = nlsh;
+    modelSelect.dataset.preferred = model;
     applyToDocument(hc, fs);
   }
 
@@ -425,30 +311,200 @@
     return selected ? selected.value : 'medium';
   }
 
+  function populateModels(models, preferred) {
+    modelSelect.innerHTML = '';
+    if (!models || models.length === 0) {
+      var empty = document.createElement('option');
+      empty.value = '';
+      empty.textContent = 'No models found';
+      modelSelect.appendChild(empty);
+      return;
+    }
+    models.forEach(function (name) {
+      var opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      if (preferred && preferred === name) opt.selected = true;
+      modelSelect.appendChild(opt);
+    });
+    if (!preferred || models.indexOf(preferred) === -1) {
+      modelSelect.selectedIndex = 0;
+      try { localStorage.setItem('terminal-ollama-model', models[0]); } catch (e) {}
+    }
+  }
+
+  function loadOllamaModels() {
+    ollamaStatus.className = 'muted';
+    ollamaStatus.textContent = 'Checking Ollama…';
+    var preferred = modelSelect.dataset.preferred || '';
+    try { preferred = localStorage.getItem('terminal-ollama-model') || preferred; } catch (e) {}
+
+    fetch('/api/ollama/models')
+      .then(function (r) {
+        return r.json().then(function (body) { return { okHttp: r.ok, body: body }; });
+      })
+      .then(function (result) {
+        var body = result.body || {};
+        if (body.ok && body.models && body.models.length) {
+          populateModels(body.models, preferred);
+          ollamaStatus.className = 'ok';
+          ollamaStatus.textContent =
+            'Ollama reachable at ' + (body.host || 'http://127.0.0.1:11434') +
+            '. ' + body.models.length + ' model' + (body.models.length === 1 ? '' : 's') + ' available.';
+          announce('Loaded ' + body.models.length + ' Ollama models.');
+        } else {
+          populateModels([], preferred);
+          ollamaStatus.className = 'err';
+          ollamaStatus.textContent =
+            'Could not list models. ' + (body.error || 'Is Ollama running?') +
+            ' Host: ' + (body.host || 'http://127.0.0.1:11434') + '. See setup hints below.';
+          announce('Could not load Ollama models.');
+        }
+      })
+      .catch(function (err) {
+        populateModels([], preferred);
+        ollamaStatus.className = 'err';
+        ollamaStatus.textContent =
+          'Could not reach the web server proxy. Start the app with npm run dev. ' +
+          (err && err.message ? err.message : '');
+        announce('Could not load Ollama models.');
+      });
+  }
+
+  function loadSetupHints() {
+    fetch('/api/ollama/setup-hints')
+      .then(function (r) { return r.json(); })
+      .then(function (body) {
+        if (!body || !body.ok) return;
+        if (setupTitle) setupTitle.textContent = body.title || 'Install Ollama';
+        if (setupSteps) {
+          setupSteps.innerHTML = '';
+          (body.steps || []).forEach(function (step) {
+            var li = document.createElement('li');
+            li.textContent = step;
+            setupSteps.appendChild(li);
+          });
+        }
+        if (setupCommands) {
+          var cmds = body.commands || [];
+          if (cmds.length) {
+            setupCommands.hidden = false;
+            setupCommands.textContent = cmds.join('\n');
+          }
+        }
+        if (setupDownload && body.downloadUrl) setupDownload.href = body.downloadUrl;
+      })
+      .catch(function () {});
+  }
+
+  function pullModel() {
+    var name = (pullModelInput && pullModelInput.value || '').trim();
+    if (!name) {
+      if (pullStatus) {
+        pullStatus.className = 'err';
+        pullStatus.textContent = 'Enter a model name (for example llama3.2).';
+      }
+      announce('Enter a model name to pull.');
+      if (pullModelInput) pullModelInput.focus();
+      return;
+    }
+    if (pullModelBtn) pullModelBtn.disabled = true;
+    if (pullStatus) {
+      pullStatus.className = 'muted';
+      pullStatus.textContent = 'Pulling ' + name + '… This can take several minutes. Keep this page open.';
+    }
+    announce('Pulling model ' + name + '. Please wait.');
+
+    fetch('/api/ollama/pull', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: name })
+    })
+      .then(function (r) {
+        return r.json().then(function (body) { return { okHttp: r.ok, body: body }; });
+      })
+      .then(function (result) {
+        var body = result.body || {};
+        if (result.okHttp && body.ok) {
+          if (pullStatus) {
+            pullStatus.className = 'ok';
+            pullStatus.textContent = body.message || ('Pulled ' + name + ' successfully.');
+          }
+          try {
+            localStorage.setItem('terminal-ollama-model', name);
+            modelSelect.dataset.preferred = name;
+          } catch (e) {}
+          announce('Model ' + name + ' pulled successfully.');
+          loadOllamaModels();
+        } else {
+          if (pullStatus) {
+            pullStatus.className = 'err';
+            pullStatus.textContent =
+              (body.error || 'Pull failed.') +
+              (body.output ? ' ' + String(body.output).slice(-300) : '');
+          }
+          announce(body.error || 'Could not pull model.');
+        }
+      })
+      .catch(function (err) {
+        if (pullStatus) {
+          pullStatus.className = 'err';
+          pullStatus.textContent =
+            'Pull request failed. Is the server running? ' +
+            (err && err.message ? err.message : '');
+        }
+        announce('Pull request failed.');
+      })
+      .finally(function () {
+        if (pullModelBtn) pullModelBtn.disabled = false;
+      });
+  }
+
   highContrastEl.addEventListener('change', function () {
     saveSettings(highContrastEl.checked, currentFontSize());
-    announce(
-      highContrastEl.checked
-        ? 'High contrast mode on.'
-        : 'High contrast mode off.'
-    );
+    announce(highContrastEl.checked ? 'High contrast mode on.' : 'High contrast mode off.');
   });
 
   fontRadios.forEach(function (radio) {
     radio.addEventListener('change', function () {
       if (!radio.checked) return;
       saveSettings(highContrastEl.checked, radio.value);
-      var labels = {
-        small: 'Small',
-        medium: 'Medium',
-        large: 'Large',
-        'x-large': 'Extra large'
-      };
-      announce('Font size set to ' + (labels[radio.value] || radio.value) + '.');
+      announce('Font size updated.');
     });
   });
 
+  modeRadios.forEach(function (radio) {
+    radio.addEventListener('change', function () {
+      if (!radio.checked) return;
+      try { localStorage.setItem('terminal-console-mode', radio.value); } catch (e) {}
+      announce(radio.value === 'full' ? 'Full console mode selected.' : 'Accessible mode selected.');
+    });
+  });
+
+  nlshEnabledEl.addEventListener('change', function () {
+    try {
+      localStorage.setItem('terminal-nlsh-enabled', nlshEnabledEl.checked ? 'true' : 'false');
+    } catch (e) {}
+    announce(nlshEnabledEl.checked ? 'Natural language shell enabled.' : 'Natural language shell disabled.');
+  });
+
+  modelSelect.addEventListener('change', function () {
+    var value = modelSelect.value || '';
+    try { localStorage.setItem('terminal-ollama-model', value); } catch (e) {}
+    if (value) announce('Ollama model set to ' + value + '.');
+  });
+
+  refreshModelsBtn.addEventListener('click', function () { loadOllamaModels(); });
+  if (pullModelBtn) pullModelBtn.addEventListener('click', pullModel);
+  if (pullModelInput) {
+    pullModelInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); pullModel(); }
+    });
+  }
+
   loadSettings();
+  loadOllamaModels();
+  loadSetupHints();
 })();
 </script>
 </body>
