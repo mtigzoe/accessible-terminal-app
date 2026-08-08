@@ -126,6 +126,65 @@ Place platform icons in an `assets/` directory:
 - `icon.ico` (Windows)
 - `icon.icns` (macOS)
 
+## Ollama on Windows or Linux
+
+The Electron app can run on Windows while using an Ollama server running either on Windows or on another computer such as your Linux machine. The backend already reads the `OLLAMA_HOST` environment variable.
+
+### Windows Ollama
+
+Use the normal development command:
+
+```powershell
+npm run electron:dev
+```
+
+By default, Ollama is expected at:
+
+```text
+http://127.0.0.1:11434
+```
+
+### Linux Ollama from Windows Electron
+
+If Ollama is running on your Linux computer, start the Electron app with `OLLAMA_HOST` pointing to the Linux Ollama server.
+
+For example, in PowerShell:
+
+```powershell
+$env:OLLAMA_HOST="http://cyber.local:11434"
+npm run electron:dev
+```
+
+The server must be reachable from Windows, and Ollama must be configured on Linux to accept connections from the Windows computer. Keep the Ollama port restricted to your trusted network rather than exposing it to the public Internet.
+
+### Easy Windows launcher
+
+To choose Windows Ollama, Linux Ollama, or another Ollama server interactively:
+
+```powershell
+.\scripts\start-electron.ps1
+```
+
+The launcher presents three choices:
+
+1. Ollama on Windows: `http://127.0.0.1:11434`
+2. Ollama on Linux: `http://cyber.local:11434`
+3. Enter a different Ollama URL
+
+You can also provide a different default Linux host:
+
+```powershell
+.\scripts\start-electron.ps1 -LinuxOllamaHost "http://192.168.1.50:11434"
+```
+
+The launcher only sets `OLLAMA_HOST` for the Electron process. It does not install, start, stop, or move Ollama models.
+
+### Choosing the model
+
+Open **Settings → Natural language shell (nlsh / Ollama)** and refresh the model list. The models shown are the models available from the configured Ollama server. If the server is Linux, the model remains on Linux; the Windows Electron application sends requests to that Linux server.
+
+The `OLLAMA_MODEL` environment variable can also be used to provide a default model name.
+
 ## How to use (screen reader)
 
 1. When the page loads, wait for “Shell ready” / “Connected to PowerShell.”
