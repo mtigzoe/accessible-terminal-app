@@ -114,6 +114,18 @@
   let pathRestoreAttempted = false;
   let commandOutputChunks = [];
 
+  // Interactive/"raw" mode: entered automatically when a full-screen
+  // program (vim, less, top, nano, ...) switches the terminal into the
+  // alternate screen buffer. In that state, line-buffered command/output
+  // handling doesn't make sense -- keystrokes need to go straight to the
+  // process instead of waiting behind the Run button. See handleIncoming,
+  // checkAltScreenMarkers, enterRawMode, exitRawMode below.
+  let rawMode = false;
+  let rawScreenBuffer = '';
+  let rawTail = '';
+  const ALT_SCREEN_ENTER_RE = /\u001b\[\?(?:1049|1047|47)h/;
+  const ALT_SCREEN_EXIT_RE = /\u001b\[\?(?:1049|1047|47)l/;
+
   let completionRequestId = 0;
   let completionPending = false;
   let applyingCompletion = false;
@@ -162,7 +174,7 @@
       return;
     }
     socket.send('\u0003');
-    appendOutput('^C\n');
+    if (!rawMode) appendOutput('^C\n');
     announce('Sent interrupt (Ctrl+C).');
   }
 
@@ -226,6 +238,13 @@
       const code = parts[0];
       if (code === 'D') lastExitOk = parts[1] === '0';
       else if (code === 'A') finishCommand();
+      else if (code === 'P') {
+        // Payload looks like "P;Cwd=/some/path" -- rejoin in case the
+        // path itself ever contains a literal semicolon.
+        const prop = parts.slice(1).join(';');
+        const cwdMatch = prop.match(/^Cwd=(.*)$/);
+        if (cwdMatch) setPath(cwdMatch[1]);
+      }
     }
     return chunk.replace(/\u001b\]633;[^\u0007]*\u0007/g, '');
   }
@@ -491,9 +510,65 @@
     }
   }
 
+  function keyEventToBytes(event) {
+    // Minimal keyboard -> terminal byte translator for raw/interactive
+    // mode. Covers the keys vim/less/nano/top navigation actually needs
+    // day to day; it is deliberately NOT a full terminal input stack (no
+    // function keys, limited modifier combos). console.html's real
+    // xterm.js Terminal already does this correctly and completely --
+    // reach for that if this subset turns out not to be enough.
+    if (event.ctrlKey && !event.shiftKey && event.key.length === 1) {
+      const code = event.key.toUpperCase().charCodeAt(0);
+      if (code >= 65 && code <= 90) return String.fromCharCode(code - 64); // Ctrl+A..Z
+    }
+    switch (event.key) {
+      case 'Enter':
+        return '\r';
+      case 'Backspace':
+        return '\u007f';
+      case 'Tab':
+        return '\t';
+      case 'Escape':
+        return '\u001b';
+      case 'ArrowUp':
+        return '\u001b[A';
+      case 'ArrowDown':
+        return '\u001b[B';
+      case 'ArrowRight':
+        return '\u001b[C';
+      case 'ArrowLeft':
+        return '\u001b[D';
+      case 'Home':
+        return '\u001b[H';
+      case 'End':
+        return '\u001b[F';
+      case 'PageUp':
+        return '\u001b[5~';
+      case 'PageDown':
+        return '\u001b[6~';
+      case 'Delete':
+        return '\u001b[3~';
+      default:
+        return event.key.length === 1 ? event.key : '';
+    }
+  }
+
+  function handleRawKeydown(event) {
+    if (event.altKey || event.metaKey) return; // let Alt+F2/Alt+O/Alt+C bubble up as usual
+    if (event.ctrlKey && !event.shiftKey && (event.key === 'c' || event.key === 'C')) {
+      event.preventDefault();
+      sendInterrupt();
+      return;
+    }
+    const bytes = keyEventToBytes(event);
+    if (!bytes) return;
+    event.preventDefault();
+    if (socket && socket.readyState === WebSocket.OPEN) socket.send(bytes);
+  }
+
   function requestPathRestore(target) {
     if (!target || !socket || socket.readyState !== WebSocket.OPEN) return;
-    socket.send(JSON.stringify({ type: 'cwd', cwd: target }));
+    socket.send(JSON.stringify({ type: 'cwd', cwd: target, mode: 'accessible' }));
   }
 
   function focusOutput() {
@@ -526,7 +601,62 @@
     }
   }
 
+  function checkAltScreenMarkers(chunk) {
+    // The enter/exit escape sequence can land split across two websocket
+    // messages; carry a small tail of the previous chunk so we still
+    // catch it at the boundary.
+    const probe = rawTail + chunk;
+    rawTail = chunk.slice(-16);
+    if (!rawMode && ALT_SCREEN_ENTER_RE.test(probe)) {
+      enterRawMode();
+    } else if (rawMode && ALT_SCREEN_EXIT_RE.test(probe)) {
+      exitRawMode();
+    }
+  }
+
+  function enterRawMode() {
+    rawMode = true;
+    rawScreenBuffer = '';
+    // A command is "in flight" from the form's point of view until the
+    // shell's own prompt (and, on bash/PowerShell, its OSC 633 marker)
+    // reappears after the program quits -- that happens naturally via
+    // the normal handleIncoming/finishCommand path once exitRawMode
+    // fires, so nothing extra is needed here to close it out later.
+    commandRunning = true;
+    runBtn.disabled = true;
+    commandEl.disabled = false;
+    commandEl.focus();
+    announceAlert(
+      'Full-screen program started. Keys now go straight to it. ' +
+        'Press Alt+F2 for a text snapshot of the screen, or quit the ' +
+        'program normally (for example, colon w q in vim, or q in less) to come back.'
+    );
+  }
+
+  function exitRawMode() {
+    rawMode = false;
+    announce('Full-screen program closed.');
+  }
+
+  function refreshRawSnapshot() {
+    const text = stripAnsi(rawScreenBuffer).replace(/\n{3,}/g, '\n\n').trim();
+    outputEl.value = text || '(No screen content captured yet.)';
+    outputEl.scrollTop = outputEl.scrollHeight;
+    const lineCount = text ? text.split('\n').length : 0;
+    announce(
+      'Snapshot refreshed, ' +
+        lineCount +
+        ' line' +
+        (lineCount === 1 ? '' : 's') +
+        '. This is a best-effort transcript, not the exact screen layout. ' +
+        'Alt+C to go back to sending keys.'
+    );
+  }
+
   function handleIncoming(data) {
+    checkAltScreenMarkers(data);
+    if (rawMode) rawScreenBuffer = (rawScreenBuffer + data).slice(-20000);
+
     rawBuffer += processOscMarkers(data);
     const clean = stripAnsi(rawBuffer);
     const lines = clean.split('\n');
@@ -548,7 +678,11 @@
       onPromptSeen(tailPath);
       rawBuffer = '';
     }
-    if (displayLines.length > 0) appendOutput(displayLines.join('\n') + '\n');
+    // While a full-screen program owns the terminal, its repeated screen
+    // repaints aren't meaningful line-by-line output -- don't flood the
+    // readonly output box (or a screen reader following it) with them.
+    // refreshRawSnapshot() is the deliberate, on-demand way to see them.
+    if (displayLines.length > 0 && !rawMode) appendOutput(displayLines.join('\n') + '\n');
   }
 
   function resetCompletion() {
@@ -841,7 +975,7 @@
 
   socket.addEventListener('open', function () {
     if (restoredPath) requestPathRestore(restoredPath);
-    else socket.send(JSON.stringify({ type: 'cwd', cwd: '' }));
+    else socket.send(JSON.stringify({ type: 'cwd', cwd: '', mode: 'accessible' }));
     announce('Connecting. Waiting for shell prompt.');
     window.setTimeout(function () {
       if (!ready && socket.readyState === WebSocket.OPEN) {
@@ -892,6 +1026,10 @@
   });
 
   commandEl.addEventListener('keydown', function (event) {
+    if (rawMode) {
+      handleRawKeydown(event);
+      return;
+    }
     if (event.ctrlKey && !event.altKey && !event.metaKey && (event.key === 'c' || event.key === 'C')) {
       const start = commandEl.selectionStart;
       const end = commandEl.selectionEnd;
@@ -950,7 +1088,8 @@
       const key = event.key.toLowerCase();
       if (key === 'f2' || event.key === 'F2' || key === 'o') {
         event.preventDefault();
-        focusOutput();
+        if (rawMode) refreshRawSnapshot();
+        else focusOutput();
       } else if (key === 'c') {
         event.preventDefault();
         commandEl.focus();

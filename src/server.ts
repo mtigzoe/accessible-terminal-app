@@ -24,6 +24,7 @@ const shell = isWindows
 const defaultCwd = os.homedir();
 
 const shellIntegrationScript = path.join(__dirname, '..', 'shell-integration', 'pwsh-integration.ps1');
+const shellIntegrationScriptBash = path.join(__dirname, '..', 'shell-integration', 'bash-integration.sh');
 
 const OLLAMA_HOST = (process.env.OLLAMA_HOST || 'http://127.0.0.1:11434').replace(/\/$/, '');
 const DEFAULT_OLLAMA_MODEL = process.env.OLLAMA_MODEL || '';
@@ -541,31 +542,59 @@ function shSingleQuoted(value: string): string {
 
 wss.on('connection', (ws: WebSocket) => {
   let ptyProcess: any = null;
+  // Set from the first `{ type: 'cwd', mode: 'accessible' }` message the
+  // client sends on connect. console.html (full console) never sends a
+  // mode, so it stays 'full' and its behavior is unchanged by anything
+  // below. index.html (accessible console) sends 'accessible'.
+  let clientMode: 'accessible' | 'full' = 'full';
 
   function buildShellArgs(cwd: string): string[] {
-    if (!isWindows) {
-      return [];
+    if (isWindows) {
+      return [
+        '-NoLogo',
+        '-NoExit',
+        '-WorkingDirectory',
+        cwd,
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        shellIntegrationScript
+      ];
     }
-    return [
-      '-NoLogo',
-      '-NoExit',
-      '-WorkingDirectory',
-      cwd,
-      '-ExecutionPolicy',
-      'Bypass',
-      '-File',
-      shellIntegrationScript
-    ];
+    if (path.basename(shell) === 'bash') {
+      // --rcfile makes bash load our integration script instead of
+      // ~/.bashrc directly; the script sources ~/.bashrc itself and then
+      // layers the OSC 633 prompt markers on top. -i forces interactive
+      // mode explicitly (node-pty already gives it a tty, but this makes
+      // it unambiguous).
+      return ['--rcfile', shellIntegrationScriptBash, '-i'];
+    }
+    // zsh/fish/etc aren't wired up yet -- those shells fall back to the
+    // matchPrompt() regex only, same as before this change.
+    return [];
   }
 
   function spawnPty(cwd: string) {
     const resolved = resolveCwd(cwd);
+    const env: NodeJS.ProcessEnv = { ...process.env };
+    if (clientMode === 'accessible') {
+      // The accessible console's #output box is a plain readonly
+      // textarea, not a live terminal grid -- it can't drive an
+      // interactive pager. Ask common tools to print plain text instead
+      // of opening `less`, so `git log`, `git diff`, `man`, etc. just
+      // work instead of leaving the UI stuck waiting for a prompt that
+      // won't come until the pager is quit. Full console (console.html)
+      // never sets clientMode, so it keeps normal paging behavior.
+      env.PAGER = env.PAGER || 'cat';
+      env.GIT_PAGER = env.GIT_PAGER || 'cat';
+      env.MANPAGER = env.MANPAGER || 'cat';
+    }
     ptyProcess = pty.spawn(shell, buildShellArgs(resolved), {
       name: 'xterm-color',
       cols: 90,
       rows: 24,
       cwd: resolved,
-      env: process.env
+      env
     });
 
     ptyProcess.onData((data: string) => {
@@ -604,6 +633,7 @@ wss.on('connection', (ws: WebSocket) => {
           rows?: number;
           cwd?: string;
           path?: string;
+          mode?: string;
         };
 
         if (parsed && typeof parsed === 'object' && typeof parsed.type === 'string') {
@@ -617,6 +647,7 @@ wss.on('connection', (ws: WebSocket) => {
           }
 
           if (parsed.type === 'cwd') {
+            if (parsed.mode === 'accessible') clientMode = 'accessible';
             const target =
               typeof parsed.cwd === 'string'
                 ? parsed.cwd
