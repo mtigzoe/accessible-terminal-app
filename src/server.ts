@@ -20,7 +20,7 @@ const shell = isWindows ? 'pwsh.exe' : process.env.SHELL || 'bash';
 const defaultCwd = os.homedir();
 const shellIntegrationScript = path.join(__dirname, '..', 'shell-integration', 'pwsh-integration.ps1');
 const shellIntegrationScriptBash = path.join(__dirname, '..', 'shell-integration', 'bash-integration.sh');
-const OLLAMA_HOST = (process.env.OLLAMA_HOST || 'http://127.0.0.1:11434').replace(/\/$/, '');
+let OLLAMA_HOST = (process.env.OLLAMA_HOST || 'http://127.0.0.1:11434').replace(/\/$/, '');
 const DEFAULT_OLLAMA_MODEL = process.env.OLLAMA_MODEL || '';
 const HOST = process.env.HOST || '0.0.0.0';
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
@@ -116,12 +116,45 @@ app.post('/api/file', (req, res) => {
   } catch (e) { res.status(500).json({ ok: false, error: e instanceof Error ? e.message : String(e) }); }
 });
 
+function normalizeOllamaHost(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  let raw = value.trim();
+  if (!/^https?:\/\//i.test(raw)) raw = `http://${raw}`;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    if (!url.hostname || url.username || url.password || url.search || url.hash) return null;
+    return url.toString().replace(/\/$/, '');
+  } catch { return null; }
+}
+
 async function fetchOllama(apiPath: string, init?: RequestInit, timeoutMs = 5000): Promise<Response> {
   const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), timeoutMs);
   try { return await fetch(`${OLLAMA_HOST}${apiPath}`, { ...init, signal: controller.signal }); }
   catch (e) { if (e instanceof Error && (e.name === 'AbortError' || /aborted/i.test(e.message))) throw new Error(`Ollama request timed out after ${timeoutMs / 1000}s at ${OLLAMA_HOST}. The model may be slow to load or busy.`); throw e; }
   finally { clearTimeout(timer); }
 }
+
+app.get('/api/ollama/config', (_req, res) => {
+  res.json({ ok: true, host: OLLAMA_HOST });
+});
+
+app.post('/api/ollama/config', async (req, res) => {
+  const host = normalizeOllamaHost(req.body?.host);
+  if (!host) { res.status(400).json({ ok: false, error: 'Enter a valid Ollama server address, such as http://cyber.local:11434.' }); return; }
+  const previous = OLLAMA_HOST;
+  OLLAMA_HOST = host;
+  try {
+    const r = await fetchOllama('/api/tags', undefined, 5000);
+    if (!r.ok) throw new Error(`Ollama returned HTTP ${r.status}.`);
+    const data = (await r.json()) as { models?: Array<{ name?: string }> };
+    const models = (data.models || []).map((m) => m.name || '').filter(Boolean);
+    res.json({ ok: true, host: OLLAMA_HOST, modelCount: models.length, models, message: `Connected to ${OLLAMA_HOST}.` });
+  } catch (e) {
+    OLLAMA_HOST = previous;
+    res.status(502).json({ ok: false, error: `Could not connect to ${host}. ${e instanceof Error ? e.message : String(e)}` });
+  }
+});
 
 app.get('/api/ollama/status', async (_req, res) => {
   try { const r = await fetchOllama('/api/tags'); if (!r.ok) { res.json({ ok: false, host: OLLAMA_HOST, error: `Ollama returned HTTP ${r.status}` }); return; }
