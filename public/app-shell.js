@@ -99,6 +99,11 @@
   const srAlert = document.getElementById('sr-alert');
   const structuredPanel = document.getElementById('structured-panel');
   const structuredContent = document.getElementById('structured-content');
+  const editorPanel = document.getElementById('editor-panel');
+  const editorStatus = document.getElementById('editor-status');
+  const editorTextarea = document.getElementById('editor-textarea');
+  const editorSaveBtn = document.getElementById('editor-save-btn');
+  const editorCancelBtn = document.getElementById('editor-cancel-btn');
 
   const history = [];
   let historyIndex = -1;
@@ -126,6 +131,15 @@
   const ALT_SCREEN_ENTER_RE = /\u001b\[\?(?:1049|1047|47)h/;
   const ALT_SCREEN_EXIT_RE = /\u001b\[\?(?:1049|1047|47)l/;
 
+  // Accessible in-page editor: replaces a direct `vim file` / `nano file`
+  // invocation with a plain <textarea> read/written through /api/file,
+  // instead of trying to make a curses program's screen readable. See
+  // matchEditorCommand/openAccessibleEditor below.
+  let editorOpen = false;
+  let editorFile = null;
+  let editorDirty = false;
+  const EDITOR_COMMAND_RE = /^(vim|vi|nvim|nano|pico)\s+(\S+)\s*$/i;
+
   let completionRequestId = 0;
   let completionPending = false;
   let applyingCompletion = false;
@@ -147,19 +161,53 @@
     return null;
   }
 
-  function announce(text) {
-    srStatus.textContent = '';
-    window.setTimeout(function () {
-      srStatus.textContent = text;
-    }, 100);
+  // announce()/announceAlert() used to just clear the live region and set
+  // new text after a fixed delay. That drops messages when two calls land
+  // close together -- e.g. "Running pwd" immediately followed by "pwd
+  // succeeded" for a command that returns in a few milliseconds, which is
+  // the common case. This gives each region its own small queue so nothing
+  // gets silently clobbered.
+  //
+  // Note: this deliberately does NOT try to hold each message on screen
+  // for as long as it'd take to speak -- that was an earlier version of
+  // this function, and it backfired: a handful of announcements arriving
+  // close together (e.g. opening then closing the file editor) could back
+  // up into a multi-second queue, so by the time a genuinely current
+  // announcement played, it was already stale. The screen reader's own
+  // speech queue paces actual speaking; this just needs to guarantee each
+  // message is a distinct, real DOM mutation so it isn't skipped.
+  function createAnnouncer(el) {
+    const queue = [];
+    let active = false;
+    const GAP_MS = 250;
+
+    function playNext() {
+      if (queue.length === 0) {
+        active = false;
+        return;
+      }
+      active = true;
+      const text = queue.shift();
+      el.textContent = '';
+      window.setTimeout(function () {
+        el.textContent = text;
+        window.setTimeout(playNext, GAP_MS);
+      }, 50);
+    }
+
+    return function (text) {
+      if (!text) return;
+      queue.push(text);
+      // Keep a small buffer so a burst of chatter can't leave someone
+      // hearing minutes-old announcements, without the multi-second
+      // holding pattern described above.
+      while (queue.length > 6) queue.shift();
+      if (!active) playNext();
+    };
   }
 
-  function announceAlert(text) {
-    srAlert.textContent = '';
-    window.setTimeout(function () {
-      srAlert.textContent = text;
-    }, 60);
-  }
+  const announce = createAnnouncer(srStatus);
+  const announceAlert = createAnnouncer(srAlert);
 
   function setControlsEnabled(enabled) {
     commandEl.disabled = !enabled;
@@ -233,11 +281,12 @@
   function processOscMarkers(chunk) {
     const oscRe = /\u001b\]633;([^\u0007]*)\u0007/g;
     let match;
+    let sawPromptMarker = false;
     while ((match = oscRe.exec(chunk)) !== null) {
       const parts = match[1].split(';');
       const code = parts[0];
       if (code === 'D') lastExitOk = parts[1] === '0';
-      else if (code === 'A') finishCommand();
+      else if (code === 'A') sawPromptMarker = true;
       else if (code === 'P') {
         // Payload looks like "P;Cwd=/some/path" -- rejoin in case the
         // path itself ever contains a literal semicolon.
@@ -246,7 +295,10 @@
         if (cwdMatch) setPath(cwdMatch[1]);
       }
     }
-    return chunk.replace(/\u001b\]633;[^\u0007]*\u0007/g, '');
+    return {
+      text: chunk.replace(/\u001b\]633;[^\u0007]*\u0007/g, ''),
+      sawPromptMarker: sawPromptMarker
+    };
   }
 
   function clearStructuredView() {
@@ -495,12 +547,32 @@
     else clearStructuredView();
   }
 
+  function buildResultAnnouncement(label, ok, rawOutput) {
+    const status = ok ? 'succeeded' : 'failed';
+    const text = String(rawOutput || '').replace(/^\n+|\s+$/g, '');
+    if (!text) return label + ' ' + status + '. No output.';
+
+    const MAX_LINES = 8;
+    const MAX_CHARS = 480;
+    const lines = text.split('\n');
+    let preview = lines.slice(0, MAX_LINES).join('. ');
+    let truncated = lines.length > MAX_LINES;
+    if (preview.length > MAX_CHARS) {
+      preview = preview.slice(0, MAX_CHARS);
+      truncated = true;
+    }
+    const tail = truncated
+      ? ' ' + lines.length + ' line' + (lines.length === 1 ? '' : 's') + ' total. Alt+O to read all output.'
+      : '';
+    return label + ' ' + status + '. ' + preview + tail;
+  }
+
   function finishCommand() {
     if (!commandRunning) return;
     commandRunning = false;
-    const status = lastExitOk ? 'succeeded' : 'failed';
     const label = pendingCommand ? pendingCommand : 'Command';
-    announce(label + ' ' + status + '.');
+    const rawOutput = commandOutputChunks.join('');
+    announce(buildResultAnnouncement(label, lastExitOk, rawOutput));
     if (pendingCommand) tryBuildStructuredView(pendingCommand);
     pendingCommand = null;
     commandOutputChunks = [];
@@ -657,7 +729,8 @@
     checkAltScreenMarkers(data);
     if (rawMode) rawScreenBuffer = (rawScreenBuffer + data).slice(-20000);
 
-    rawBuffer += processOscMarkers(data);
+    const osc = processOscMarkers(data);
+    rawBuffer += osc.text;
     const clean = stripAnsi(rawBuffer);
     const lines = clean.split('\n');
     rawBuffer = lines.pop() || '';
@@ -678,6 +751,15 @@
       onPromptSeen(tailPath);
       rawBuffer = '';
     }
+    // Only now that this chunk's own output text has been parsed into
+    // lines and collected above do we act on a 633;A marker that arrived
+    // in the same chunk. finishCommand() clears commandOutputChunks, so
+    // calling it any earlier (as processOscMarkers used to, directly)
+    // could wipe out output that arrived in the very same pty read as
+    // the marker -- easy to hit for fast commands, since the shell can
+    // write its output and the next prompt close enough together to
+    // land in one chunk.
+    if (osc.sawPromptMarker) finishCommand();
     // While a full-screen program owns the terminal, its repeated screen
     // repaints aren't meaningful line-by-line output -- don't flood the
     // readonly output box (or a screen reader following it) with them.
@@ -896,9 +978,139 @@
       });
   }
 
+  function matchEditorCommand(text) {
+    const m = String(text || '').trim().match(EDITOR_COMMAND_RE);
+    if (!m) return null;
+    return { editor: m[1], file: m[2] };
+  }
+
+  function openAccessibleEditor(file, editorName) {
+    if (commandRunning) {
+      announce('Wait for the current command to finish.');
+      return;
+    }
+    editorOpen = true;
+    editorFile = file;
+    editorDirty = false;
+    appendOutput((currentPath ? currentPath : '$') + '> ' + editorName + ' ' + file + '\n');
+    commandEl.value = '';
+    setControlsEnabled(false);
+    clearStructuredView();
+    editorPanel.hidden = false;
+    editorTextarea.value = '';
+    editorStatus.textContent = 'Opening ' + file + '…';
+    announce('Opening ' + file + ' in the editor.');
+
+    fetch('/api/file?path=' + encodeURIComponent(file) + '&cwd=' + encodeURIComponent(currentPath || ''))
+      .then(function (r) {
+        return r.json().then(function (body) {
+          if (!r.ok || !body.ok) throw new Error((body && body.error) || 'Could not open file.');
+          return body;
+        });
+      })
+      .then(function (body) {
+        editorTextarea.value = body.content || '';
+        editorDirty = false;
+        const lineCount = body.content ? body.content.split('\n').length : 0;
+        editorStatus.textContent = body.isNew
+          ? file + ' is a new file. Type your content, then Save (Ctrl+S) or Cancel (Escape) to discard.'
+          : file + ' loaded, ' + lineCount + ' line' + (lineCount === 1 ? '' : 's') + '. Edit, then Save (Ctrl+S) or Cancel (Escape).';
+        editorTextarea.focus();
+        announce(editorStatus.textContent);
+      })
+      .catch(function (err) {
+        const message = 'Could not open ' + file + '. ' + (err && err.message ? err.message : '');
+        closeAccessibleEditor(false, true);
+        announce(message);
+      });
+  }
+
+  function saveAccessibleEditor() {
+    if (!editorOpen || !editorFile) return;
+    editorStatus.textContent = 'Saving ' + editorFile + '…';
+    announce('Saving ' + editorFile + '.');
+    fetch('/api/file', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: editorFile, cwd: currentPath || '', content: editorTextarea.value })
+    })
+      .then(function (r) {
+        return r.json().then(function (body) {
+          if (!r.ok || !body.ok) throw new Error((body && body.error) || 'Save failed.');
+          return body;
+        });
+      })
+      .then(function () {
+        const savedFile = editorFile;
+        editorDirty = false;
+        closeAccessibleEditor(true, false);
+        announceAlert('Saved ' + savedFile + '.');
+      })
+      .catch(function (err) {
+        editorStatus.textContent = 'Could not save. ' + (err && err.message ? err.message : '');
+        announceAlert(editorStatus.textContent);
+        editorTextarea.focus();
+      });
+  }
+
+  function closeAccessibleEditor(saved, silent) {
+    if (!editorOpen) return;
+    if (!saved && editorDirty && !silent) {
+      const discard = window.confirm(
+        'Discard unsaved changes to ' + editorFile + '?'
+      );
+      if (!discard) {
+        editorTextarea.focus();
+        return;
+      }
+    }
+    const wasFile = editorFile;
+    editorOpen = false;
+    editorFile = null;
+    editorDirty = false;
+    editorPanel.hidden = true;
+    editorTextarea.value = '';
+    editorStatus.textContent = '';
+    setControlsEnabled(true);
+    if (!saved && !silent) announce('Discarded changes to ' + wasFile + '. Back to command mode.');
+    commandEl.focus();
+  }
+
+  editorTextarea.addEventListener('input', function () {
+    editorDirty = true;
+  });
+
+  editorTextarea.addEventListener('keydown', function (event) {
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && (event.key === 's' || event.key === 'S')) {
+      event.preventDefault();
+      saveAccessibleEditor();
+      return;
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeAccessibleEditor(false, false);
+    }
+  });
+
+  editorSaveBtn.addEventListener('click', function () {
+    saveAccessibleEditor();
+  });
+  editorCancelBtn.addEventListener('click', function () {
+    closeAccessibleEditor(false, false);
+  });
+
   function submitCommandLine(rawText) {
     var text = (rawText || '').trim();
     if (!text) return;
+
+    const editorMatch = matchEditorCommand(text);
+    if (editorMatch) {
+      history.push(text);
+      historyIndex = history.length;
+      draftBeforeHistory = '';
+      openAccessibleEditor(editorMatch.file, editorMatch.editor);
+      return;
+    }
 
     if (isNlshEnabled() && isNaturalLanguage(text)) {
       runBtn.disabled = true;

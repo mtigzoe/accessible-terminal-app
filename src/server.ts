@@ -9,7 +9,7 @@ import { WebSocket, WebSocketServer, RawData } from 'ws';
 const pty = require('node-pty');
 
 const app = express();
-app.use(express.json({ limit: '256kb' }));
+app.use(express.json({ limit: '4mb' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 const server = http.createServer(app);
@@ -247,6 +247,85 @@ app.post('/api/complete', async (req, res) => {
     matches: result.matches,
     error: result.error
   });
+});
+
+// Backs the accessible console's in-page file editor (public/app-shell.js
+// -> openAccessibleEditor). A curses program like vim is inherently
+// spatial and doesn't translate to a screen reader no matter how the
+// terminal around it is wired up, so instead of trying to make vim
+// itself readable, the accessible console intercepts a direct `vim
+// <file>` / `nano <file>` command client-side and edits the file through
+// these two endpoints with a plain <textarea> instead. Full console
+// (console.html) is unaffected -- it never calls these, vim still runs
+// normally there.
+const MAX_EDIT_FILE_BYTES = 2 * 1024 * 1024;
+
+app.get('/api/file', (req, res) => {
+  const cwd = resolveCwd(req.query.cwd);
+  const target = typeof req.query.path === 'string' ? req.query.path.trim() : '';
+  if (!target) {
+    res.status(400).json({ ok: false, error: 'Missing path.' });
+    return;
+  }
+  const resolved = path.resolve(cwd, target);
+  try {
+    if (!fs.existsSync(resolved)) {
+      res.json({ ok: true, path: resolved, content: '', isNew: true });
+      return;
+    }
+    const stat = fs.statSync(resolved);
+    if (stat.isDirectory()) {
+      res.status(400).json({ ok: false, error: resolved + ' is a directory, not a file.' });
+      return;
+    }
+    if (stat.size > MAX_EDIT_FILE_BYTES) {
+      res.status(413).json({
+        ok: false,
+        error: 'File is larger than 2 MB -- open it in the full console instead.'
+      });
+      return;
+    }
+    const content = fs.readFileSync(resolved, 'utf8');
+    res.json({ ok: true, path: resolved, content, isNew: false });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e instanceof Error ? e.message : String(e) });
+  }
+});
+
+app.post('/api/file', (req, res) => {
+  const cwd = resolveCwd(req.body?.cwd);
+  const target = typeof req.body?.path === 'string' ? req.body.path.trim() : '';
+  const content = typeof req.body?.content === 'string' ? req.body.content : null;
+
+  if (!target) {
+    res.status(400).json({ ok: false, error: 'Missing path.' });
+    return;
+  }
+  if (content === null) {
+    res.status(400).json({ ok: false, error: 'Missing content.' });
+    return;
+  }
+  if (Buffer.byteLength(content, 'utf8') > MAX_EDIT_FILE_BYTES) {
+    res.status(413).json({ ok: false, error: 'Content is larger than 2 MB.' });
+    return;
+  }
+
+  const resolved = path.resolve(cwd, target);
+  try {
+    const parentDir = path.dirname(resolved);
+    if (!fs.existsSync(parentDir) || !fs.statSync(parentDir).isDirectory()) {
+      res.status(400).json({ ok: false, error: 'Directory does not exist: ' + parentDir });
+      return;
+    }
+    if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
+      res.status(400).json({ ok: false, error: resolved + ' is a directory, not a file.' });
+      return;
+    }
+    fs.writeFileSync(resolved, content, 'utf8');
+    res.json({ ok: true, path: resolved });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e instanceof Error ? e.message : String(e) });
+  }
 });
 
 async function fetchOllama(
