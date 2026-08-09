@@ -11,9 +11,6 @@
     var fs = localStorage.getItem('terminal-font-size') || 'medium';
     document.documentElement.setAttribute('data-high-contrast', hc ? 'true' : 'false');
     document.documentElement.setAttribute('data-font-size', fs);
-    if (localStorage.getItem('terminal-console-mode') === 'full') {
-      window.location.replace('console.html');
-    }
   } catch (e) {}
 })();
 </script>
