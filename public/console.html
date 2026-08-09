@@ -5,380 +5,44 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Accessible console — Accessible Terminal</title>
 <style>
-  :root {
-    --bg: #0c0c0c;
-    --panel: #161616;
-    --text: #e6e6e6;
-    --muted: #a0a0a0;
-    --accent: #4fc1e9;
-    --border: #333;
-    --focus: #4fc1e9;
-    --error: #f48771;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    padding: 12px;
-    padding-top: 56px;
-    background: var(--panel);
-    color: var(--text);
-    font-family: "Segoe UI", system-ui, sans-serif;
-    min-height: 100vh;
-  }
-  .app-menu { position: fixed; top: 12px; left: 12px; z-index: 100; }
-  .menu-toggle, .toolbar button, .actions button {
-    background: #2a2a2a;
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 8px 12px;
-    cursor: pointer;
-    font-size: 0.95rem;
-    font-family: inherit;
-  }
-  .menu-toggle:focus, button:focus, input:focus, textarea:focus, a:focus {
-    outline: 2px solid var(--focus);
-    outline-offset: 2px;
-  }
-  .menu-toggle[aria-expanded="true"], button:hover { border-color: var(--accent); }
-  .menu-panel {
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    margin: 4px 0 0;
-    min-width: 13rem;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 6px 0;
-    list-style: none;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.45);
-  }
-  .menu-panel[data-open="true"] { display: block; }
-  .menu-panel a { display: block; padding: 8px 14px; color: var(--text); text-decoration: none; }
-  .menu-panel a:hover, .menu-panel a:focus { background: #1e4d6b; outline: none; }
-
-  main { max-width: 72rem; margin: 0 auto; }
-  .toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    align-items: center;
-    margin-bottom: 10px;
-  }
-  .toolbar p { margin: 0; color: var(--muted); flex: 1 1 24rem; }
-  .toolbar a { color: var(--accent); }
-  .toolbar .primary { background: #1e4d6b; border-color: #2a6a90; }
-
-  .panel {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 14px 16px;
-    margin-bottom: 12px;
-  }
-  .panel h1, .panel h2 { margin: 0 0 8px; }
-  .panel h1 { font-size: 1.2rem; }
-  .panel h2 { font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
-
-  #status-line { margin: 0; color: var(--muted); }
-  #status-line[data-state="connected"] { color: #89d185; }
-  #status-line[data-state="error"] { color: var(--error); }
-
-  #output {
-    width: 100%;
-    min-height: 55vh;
-    height: 55vh;
-    resize: vertical;
-    background: #000;
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 12px;
-    font-family: Consolas, "Courier New", monospace;
-    font-size: 1rem;
-    line-height: 1.4;
-    white-space: pre;
-    overflow: auto;
-  }
-
-  .command-row { display: flex; gap: 10px; align-items: flex-end; }
-  .command-field { flex: 1 1 auto; min-width: 12rem; }
-  .command-label { display: block; color: var(--muted); margin-bottom: 5px; font-size: 0.9rem; }
-  #command {
-    width: 100%;
-    background: #000;
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 10px 12px;
-    font-family: Consolas, "Courier New", monospace;
-    font-size: 1rem;
-  }
-  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-  .actions .primary { background: #1e4d6b; border-color: #2a6a90; }
-
-  .help {
-    margin: 10px 0 0;
-    color: var(--muted);
-    font-size: 0.9rem;
-  }
-  kbd {
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    padding: 1px 5px;
-    background: #1b1b1b;
-    color: var(--text);
-  }
-  .visually-hidden {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0,0,0,0);
-    white-space: nowrap;
-    border: 0;
-  }
+:root{--bg:#0c0c0c;--panel:#161616;--text:#e6e6e6;--muted:#a0a0a0;--accent:#4fc1e9;--border:#333;--focus:#4fc1e9;--error:#f48771}
+*{box-sizing:border-box}body{margin:0;padding:12px;padding-top:56px;background:var(--panel);color:var(--text);font-family:"Segoe UI",system-ui,sans-serif;min-height:100vh}
+.app-menu{position:fixed;top:12px;left:12px;z-index:100}.menu-toggle,.actions button,.toolbar button{background:#2a2a2a;color:var(--text);border:1px solid var(--border);border-radius:4px;padding:8px 12px;cursor:pointer;font-size:.95rem;font-family:inherit}.menu-toggle:focus,button:focus,input:focus,textarea:focus,a:focus{outline:2px solid var(--focus);outline-offset:2px}.menu-toggle[aria-expanded="true"],button:hover{border-color:var(--accent)}
+.menu-panel{display:none;position:absolute;top:100%;left:0;margin:4px 0 0;min-width:13rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 0;list-style:none;box-shadow:0 6px 20px rgba(0,0,0,.45)}.menu-panel[data-open="true"]{display:block}.menu-panel a{display:block;padding:8px 14px;color:var(--text);text-decoration:none}.menu-panel a:hover,.menu-panel a:focus{background:#1e4d6b;outline:none}
+main{max-width:72rem;margin:0 auto}.panel{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:14px 16px;margin-bottom:12px}.panel h1,.panel h2{margin:0 0 8px}.panel h1{font-size:1.2rem}.panel h2{font-size:.85rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+#status-line{margin:0;color:var(--muted)}#status-line[data-state="connected"]{color:#89d185}#status-line[data-state="error"]{color:var(--error)}
+#output{width:100%;min-height:50vh;height:50vh;resize:vertical;background:#000;color:var(--text);border:1px solid var(--border);border-radius:4px;padding:12px;font-family:Consolas,"Courier New",monospace;font-size:1rem;line-height:1.4;white-space:pre;overflow:auto}
+.command-row{display:flex;gap:10px;align-items:flex-end}.command-field{flex:1 1 auto;min-width:12rem}.command-label{display:block;color:var(--muted);margin-bottom:5px;font-size:.9rem}#command,#cwd{width:100%;background:#000;color:var(--text);border:1px solid var(--border);border-radius:4px;padding:10px 12px;font-family:Consolas,"Courier New",monospace;font-size:1rem}.actions{display:flex;gap:8px;flex-wrap:wrap}.actions .primary{background:#1e4d6b;border-color:#2a6a90}.toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.toolbar button{padding:7px 10px}.help{margin:10px 0 0;color:var(--muted);font-size:.9rem}kbd{border:1px solid var(--border);border-radius:3px;padding:1px 5px;background:#1b1b1b;color:var(--text)}
+#completion-status{min-height:1.3em;margin:8px 0 0;color:var(--muted)}.visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 </style>
 </head>
 <body>
-  <nav class="app-menu" aria-label="Main menu">
-    <button type="button" class="menu-toggle" id="menu-toggle" aria-expanded="false" aria-controls="menu-panel" aria-haspopup="menu">Menu</button>
-    <ul class="menu-panel" id="menu-panel" role="menu" data-open="false">
-      <li role="none"><a role="menuitem" href="index.html" tabindex="-1" data-go-accessible>Accessible terminal</a></li>
-      <li role="none"><a role="menuitem" href="console.html" aria-current="page" tabindex="-1">Accessible console</a></li>
-      <li role="none"><a role="menuitem" href="instructions.html" tabindex="-1">Instructions</a></li>
-      <li role="none"><a role="menuitem" href="settings.html" tabindex="-1">Settings</a></li>
-    </ul>
-  </nav>
-
-  <main>
-    <section class="panel" aria-labelledby="title">
-      <h1 id="title">Accessible console</h1>
-      <p id="status-line" aria-live="polite" data-state="connecting">Connecting to the PTY…</p>
-    </section>
-
-    <section class="panel" aria-labelledby="output-heading">
-      <h2 id="output-heading">Command output</h2>
-      <textarea id="output" readonly spellcheck="false" aria-label="Command output, read-only"></textarea>
-    </section>
-
-    <section class="panel" aria-labelledby="command-heading">
-      <form id="command-form" class="command-row">
-        <div class="command-field">
-          <label id="command-heading" class="command-label" for="command">Command</label>
-          <input id="command" type="text" autocomplete="off" spellcheck="false" aria-describedby="command-help" disabled>
-        </div>
-        <div class="actions">
-          <button type="submit" class="primary" id="run-btn" disabled>Run</button>
-          <button type="button" id="interrupt-btn" disabled>Ctrl+C</button>
-          <button type="button" id="clear-btn">Clear output</button>
-        </div>
-      </form>
-      <p id="command-help" class="help">
-        Press <kbd>Enter</kbd> to run. <kbd>Up</kbd>/<kbd>Down</kbd> browse command history.
-        <kbd>Ctrl+C</kbd> interrupts the running process. <kbd>Ctrl+L</kbd> clears the output view.
-      </p>
-    </section>
-  </main>
-
-  <div id="sr-status" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
-  <div id="sr-alert" class="visually-hidden" role="alert" aria-live="assertive" aria-atomic="true"></div>
-
+<nav class="app-menu" aria-label="Main menu"><button type="button" class="menu-toggle" id="menu-toggle" aria-expanded="false" aria-controls="menu-panel" aria-haspopup="menu">Menu</button><ul class="menu-panel" id="menu-panel" role="menu" data-open="false"><li role="none"><a role="menuitem" href="index.html" tabindex="-1" data-go-accessible>Accessible terminal</a></li><li role="none"><a role="menuitem" href="console.html" aria-current="page" tabindex="-1">Accessible console</a></li><li role="none"><a role="menuitem" href="instructions.html" tabindex="-1">Instructions</a></li><li role="none"><a role="menuitem" href="settings.html" tabindex="-1">Settings</a></li></ul></nav>
+<main>
+<section class="panel" aria-labelledby="title"><h1 id="title">Accessible console</h1><p id="status-line" aria-live="polite" data-state="connecting">Connecting to the PowerShell PTY…</p></section>
+<section class="panel" aria-labelledby="output-heading"><h2 id="output-heading">Command output</h2><textarea id="output" readonly spellcheck="false" aria-label="Command output, read-only"></textarea><div class="toolbar" aria-label="Output actions"><button type="button" id="read-output-btn">Read latest output</button><button type="button" id="copy-output-btn">Copy output</button><button type="button" id="save-output-btn">Save output</button><button type="button" id="clear-btn">Clear output</button></div></section>
+<section class="panel" aria-labelledby="command-heading"><form id="command-form" class="command-row"><div class="command-field"><label id="command-heading" class="command-label" for="command">Command</label><input id="command" type="text" autocomplete="off" spellcheck="false" aria-describedby="command-help completion-status" disabled></div><div class="actions"><button type="submit" class="primary" id="run-btn" disabled>Run</button><button type="button" id="interrupt-btn" disabled>Ctrl+C</button></div></form><p id="completion-status" aria-live="polite"></p><p id="command-help" class="help">Press <kbd>Enter</kbd> to run. <kbd>Up</kbd>/<kbd>Down</kbd> browse history. <kbd>Tab</kbd> requests PowerShell completion. <kbd>Ctrl+C</kbd> interrupts. <kbd>Ctrl+L</kbd> clears the view. <kbd>Escape</kbd> clears the command.</p></section>
+<section class="panel" aria-labelledby="directory-heading"><h2 id="directory-heading">Working directory</h2><label class="command-label" for="cwd">Directory</label><div class="command-row"><div class="command-field"><input id="cwd" type="text" autocomplete="off" spellcheck="false" aria-describedby="cwd-help"></div><div class="actions"><button type="button" id="set-cwd-btn">Set directory</button><button type="button" id="home-cwd-btn">Home</button></div></div><p id="cwd-help" class="help">Changing this directory changes the current PowerShell location. The last directory is remembered on this computer.</p></section>
+</main>
+<div id="sr-status" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div><div id="sr-alert" class="visually-hidden" role="alert" aria-live="assertive" aria-atomic="true"></div>
 <script>
-(function () {
-  const menuToggle = document.getElementById('menu-toggle');
-  const menuPanel = document.getElementById('menu-panel');
-  const menuItems = Array.prototype.slice.call(menuPanel.querySelectorAll('[role="menuitem"]'));
-  const output = document.getElementById('output');
-  const command = document.getElementById('command');
-  const form = document.getElementById('command-form');
-  const runBtn = document.getElementById('run-btn');
-  const interruptBtn = document.getElementById('interrupt-btn');
-  const clearBtn = document.getElementById('clear-btn');
-  const status = document.getElementById('status-line');
-  const srStatus = document.getElementById('sr-status');
-  const srAlert = document.getElementById('sr-alert');
-
-  let socket = null;
-  let history = [];
-  let historyIndex = -1;
-  let currentCwd = '';
-  let connected = false;
-
-  function announce(text, assertive) {
-    const target = assertive ? srAlert : srStatus;
-    target.textContent = '';
-    setTimeout(function () { target.textContent = text; }, 50);
-  }
-
-  function setStatus(text, state) {
-    status.textContent = text;
-    status.dataset.state = state || '';
-  }
-
-  function appendOutput(text) {
-    if (!text) return;
-    output.value += text;
-    output.scrollTop = output.scrollHeight;
-  }
-
-  function sendRaw(text) {
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(text);
-      return true;
-    }
-    announce('The terminal is not connected.', true);
-    return false;
-  }
-
-  function connect() {
-    const protocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
-    socket = new WebSocket(protocol + location.host + '/ws');
-
-    socket.addEventListener('open', function () {
-      connected = true;
-      command.disabled = false;
-      runBtn.disabled = false;
-      interruptBtn.disabled = false;
-      setStatus('Connected to the Windows PowerShell PTY.', 'connected');
-
-      let saved = '';
-      try { saved = localStorage.getItem('terminal-last-path') || ''; } catch (e) {}
-      socket.send(JSON.stringify({ type: 'cwd', cwd: saved.trim(), mode: 'accessible' }));
-      announce('Console connected. Command input is ready.');
-      command.focus();
-    });
-
-    socket.addEventListener('message', function (event) {
-      const text = typeof event.data === 'string' ? event.data : String(event.data);
-      appendOutput(text);
-      const cwdMatch = text.match(/(?:^|\r?\n)(?:PS )?([A-Za-z]:\\[^\r\n>]*|(?:\/[^\r\n$]*)+)\s*>\s*$/m);
-      if (cwdMatch) currentCwd = cwdMatch[1];
-    });
-
-    socket.addEventListener('close', function () {
-      connected = false;
-      command.disabled = true;
-      runBtn.disabled = true;
-      interruptBtn.disabled = true;
-      setStatus('Terminal connection closed.', 'error');
-      announce('Terminal connection closed.', true);
-    });
-
-    socket.addEventListener('error', function () {
-      setStatus('Could not connect to the terminal.', 'error');
-      announce('Could not connect to the terminal.', true);
-    });
-  }
-
-  function runCommand(value) {
-    const text = value.trim();
-    if (!text || !connected) return;
-    if (history.length === 0 || history[history.length - 1] !== text) history.push(text);
-    if (history.length > 100) history.shift();
-    historyIndex = -1;
-    sendRaw(text + '\r');
-    command.value = '';
-    announce('Command sent: ' + text);
-  }
-
-  form.addEventListener('submit', function (event) {
-    event.preventDefault();
-    runCommand(command.value);
-  });
-
-  command.addEventListener('keydown', function (event) {
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      if (!history.length) return;
-      if (historyIndex < history.length - 1) historyIndex += 1;
-      command.value = history[history.length - 1 - historyIndex] || '';
-      command.select();
-    } else if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      if (!history.length) return;
-      if (historyIndex > 0) {
-        historyIndex -= 1;
-        command.value = history[history.length - 1 - historyIndex] || '';
-      } else {
-        historyIndex = -1;
-        command.value = '';
-      }
-      command.select();
-    } else if (event.ctrlKey && event.key.toLowerCase() === 'c') {
-      event.preventDefault();
-      sendRaw('\u0003');
-      announce('Interrupt sent.');
-    } else if (event.ctrlKey && event.key.toLowerCase() === 'l') {
-      event.preventDefault();
-      output.value = '';
-      sendRaw('\u000c');
-      announce('Output cleared.');
-    } else if (event.key === 'Escape') {
-      command.value = '';
-      historyIndex = -1;
-    }
-  });
-
-  interruptBtn.addEventListener('click', function () {
-    sendRaw('\u0003');
-    command.focus();
-    announce('Interrupt sent.');
-  });
-
-  clearBtn.addEventListener('click', function () {
-    output.value = '';
-    command.focus();
-    announce('Output cleared.');
-  });
-
-  function isMenuOpen() { return menuToggle.getAttribute('aria-expanded') === 'true'; }
-  function setMenuOpen(open, index) {
-    menuToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-    menuPanel.dataset.open = open ? 'true' : 'false';
-    if (open && menuItems[index || 0]) menuItems[index || 0].focus();
-    else menuToggle.focus();
-  }
-  menuToggle.addEventListener('click', function () { setMenuOpen(!isMenuOpen(), 0); });
-  menuToggle.addEventListener('keydown', function (event) {
-    if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      setMenuOpen(true, 0);
-    }
-  });
-  menuPanel.addEventListener('keydown', function (event) {
-    if (!isMenuOpen()) return;
-    const index = menuItems.indexOf(document.activeElement);
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      menuItems[(index + 1) % menuItems.length].focus();
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      menuItems[(index - 1 + menuItems.length) % menuItems.length].focus();
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      setMenuOpen(false);
-    }
-  });
-  document.addEventListener('click', function (event) {
-    if (!menuToggle.contains(event.target) && !menuPanel.contains(event.target) && isMenuOpen()) {
-      menuToggle.setAttribute('aria-expanded', 'false');
-      menuPanel.dataset.open = 'false';
-    }
-  });
-
-  document.querySelectorAll('[data-go-accessible]').forEach(function (link) {
-    link.addEventListener('click', function () {
-      try { localStorage.setItem('terminal-console-mode', 'accessible'); } catch (e) {}
-    });
-  });
-
-  try { localStorage.setItem('terminal-console-mode', 'accessible'); } catch (e) {}
-  connect();
+(function(){
+const menuToggle=document.getElementById('menu-toggle'),menuPanel=document.getElementById('menu-panel'),menuItems=Array.prototype.slice.call(menuPanel.querySelectorAll('[role="menuitem"]'));const output=document.getElementById('output'),command=document.getElementById('command'),form=document.getElementById('command-form'),runBtn=document.getElementById('run-btn'),interruptBtn=document.getElementById('interrupt-btn'),clearBtn=document.getElementById('clear-btn'),readBtn=document.getElementById('read-output-btn'),copyBtn=document.getElementById('copy-output-btn'),saveBtn=document.getElementById('save-output-btn'),cwd=document.getElementById('cwd'),setCwdBtn=document.getElementById('set-cwd-btn'),homeCwdBtn=document.getElementById('home-cwd-btn'),status=document.getElementById('status-line'),completionStatus=document.getElementById('completion-status'),srStatus=document.getElementById('sr-status'),srAlert=document.getElementById('sr-alert');
+let socket=null,history=[],historyIndex=-1,connected=false,completionMatches=[],completionIndex=0,completionRequest=0;
+function announce(text,assertive){const target=assertive?srAlert:srStatus;target.textContent='';setTimeout(function(){target.textContent=text},40)}function setStatus(text,state){status.textContent=text;status.dataset.state=state||''}function appendOutput(text){if(!text)return;output.value+=text;output.scrollTop=output.scrollHeight}function sendRaw(text){if(socket&&socket.readyState===WebSocket.OPEN){socket.send(text);return true}announce('The terminal is not connected.',true);return false}
+function saveHistory(){try{localStorage.setItem('terminal-command-history',JSON.stringify(history.slice(-200)))}catch(e){}}function loadHistory(){try{const v=JSON.parse(localStorage.getItem('terminal-command-history')||'[]');if(Array.isArray(v))history=v.filter(x=>typeof x==='string').slice(-200)}catch(e){}}
+function setWorkingDirectory(value,announceIt){const text=(value||'').trim();if(!text)return;if(!sendRaw(JSON.stringify({type:'cwd',cwd:text,mode:'accessible'})))return;cwd.value=text;try{localStorage.setItem('terminal-last-path',text)}catch(e){}if(announceIt)announce('Working directory set to '+text)}
+function connect(){const protocol=location.protocol==='https:'?'wss://':'ws://';socket=new WebSocket(protocol+location.host+'/ws');socket.addEventListener('open',function(){connected=true;command.disabled=false;runBtn.disabled=false;interruptBtn.disabled=false;setStatus('Connected to the PowerShell PTY.','connected');let saved='';try{saved=localStorage.getItem('terminal-last-path')||''}catch(e){}if(saved)cwd.value=saved;socket.send(JSON.stringify({type:'cwd',cwd:saved,mode:'accessible'}));announce('Console connected. Command input is ready.');command.focus()});socket.addEventListener('message',function(event){const text=typeof event.data==='string'?event.data:String(event.data);appendOutput(text);const cwdMatch=text.match(/(?:^|\r?\n)(?:PS )?([A-Za-z]:\\[^\r\n>]*|(?:\/[^\r\n$]*)+)\s*>\s*$/m);if(cwdMatch){cwd.value=cwdMatch[1];try{localStorage.setItem('terminal-last-path',cwd.value)}catch(e){}}});socket.addEventListener('close',function(){connected=false;command.disabled=true;runBtn.disabled=true;interruptBtn.disabled=true;setStatus('Terminal connection closed.','error');announce('Terminal connection closed.',true)});socket.addEventListener('error',function(){setStatus('Could not connect to the terminal.','error');announce('Could not connect to the terminal.',true)})}
+function runCommand(value){const text=value.trim();if(!text||!connected)return;if(history.length===0||history[history.length-1]!==text)history.push(text);if(history.length>200)history.shift();saveHistory();historyIndex=-1;completionMatches=[];sendRaw(text+'\r');command.value='';completionStatus.textContent='';announce('Command sent: '+text)}
+async function requestCompletion(){if(!connected)return;const cursor=command.selectionStart===null?command.value.length:command.selectionStart;const id=++completionRequest;completionStatus.textContent='Requesting completion…';try{const r=await fetch('/api/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({line:command.value,cursor:cursor,cwd:cwd.value,id:id})});const data=await r.json();if(id!==completionRequest)return;if(data.error&&!data.matches.length){completionStatus.textContent='No completion available.';announce('No completion available.');return}completionMatches=Array.isArray(data.matches)?data.matches:[];completionIndex=0;if(!completionMatches.length){completionStatus.textContent='No completion matches.';announce('No completion matches.');return}completionStatus.textContent=completionMatches.length+' completion'+(completionMatches.length===1?'':'s')+' available. Press Tab again to cycle.';applyCompletion(data)}catch(e){completionStatus.textContent='Completion request failed.';announce('Completion request failed.',true)}}
+function applyCompletion(data){if(!completionMatches.length)return;const value=command.value;const start=Math.max(0,Number(data.replacementIndex)||0),length=Math.max(0,Number(data.replacementLength)||0);const match=completionMatches[completionIndex%completionMatches.length];command.value=value.slice(0,start)+match+value.slice(start+length);const pos=start+match.length;command.setSelectionRange(pos,pos);announce('Completion '+((completionIndex%completionMatches.length)+1)+' of '+completionMatches.length+': '+match)}
+function cycleCompletion(){if(!completionMatches.length){requestCompletion();return}completionIndex=(completionIndex+1)%completionMatches.length;completionStatus.textContent=completionMatches.length+' completions available. Showing '+(completionIndex+1)+' of '+completionMatches.length+'.';const token=command.value;const before=token.slice(0,command.selectionStart||token.length);const cursor=command.selectionStart||token.length;const match=before.match(/(?:^|[\s|;])([^\s|;]*)$/);if(!match)return;const start=cursor-match[1].length;const current=completionMatches[completionIndex];command.value=token.slice(0,start)+current+token.slice(cursor);const pos=start+current.length;command.setSelectionRange(pos,pos);announce('Completion '+(completionIndex+1)+' of '+completionMatches.length+': '+current)}
+form.addEventListener('submit',function(e){e.preventDefault();runCommand(command.value)});
+command.addEventListener('keydown',function(e){if(e.key==='Tab'){e.preventDefault();if(completionMatches.length)cycleCompletion();else requestCompletion();return}if(e.key==='ArrowUp'){e.preventDefault();if(!history.length)return;if(historyIndex<history.length-1)historyIndex++;command.value=history[history.length-1-historyIndex]||'';command.setSelectionRange(command.value.length,command.value.length)}else if(e.key==='ArrowDown'){e.preventDefault();if(!history.length)return;if(historyIndex>0){historyIndex--;command.value=history[history.length-1-historyIndex]||''}else{historyIndex=-1;command.value=''}command.setSelectionRange(command.value.length,command.value.length)}else if(e.ctrlKey&&e.key.toLowerCase()==='c'){e.preventDefault();sendRaw('\u0003');announce('Interrupt sent.')}else if(e.ctrlKey&&e.key.toLowerCase()==='l'){e.preventDefault();output.value='';announce('Output view cleared.')}else if(e.key==='Escape'){command.value='';historyIndex=-1;completionMatches=[];completionStatus.textContent='';announce('Command cleared.')}});
+interruptBtn.addEventListener('click',function(){sendRaw('\u0003');command.focus();announce('Interrupt sent.')});clearBtn.addEventListener('click',function(){output.value='';command.focus();announce('Output view cleared.')});readBtn.addEventListener('click',function(){const text=output.value;if(!text){announce('There is no output to read.');return}const latest=text.slice(-3000);announce('Latest output: '+latest);output.focus()});copyBtn.addEventListener('click',async function(){try{await navigator.clipboard.writeText(output.value);announce('Output copied to clipboard.')}catch(e){output.focus();output.select();announce('Output selected. Press Control C to copy.')}});saveBtn.addEventListener('click',function(){const blob=new Blob([output.value],{type:'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='terminal-output.txt';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url)},1000);announce('Output saved as terminal-output.txt.')});
+setCwdBtn.addEventListener('click',function(){setWorkingDirectory(cwd.value,true);command.focus()});cwd.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();setWorkingDirectory(cwd.value,true);command.focus()}});homeCwdBtn.addEventListener('click',function(){setWorkingDirectory('',true);announce('Home directory requested. The server will use the default home directory.');command.focus()});
+function isMenuOpen(){return menuToggle.getAttribute('aria-expanded')==='true'}function setMenuOpen(open,index){menuToggle.setAttribute('aria-expanded',open?'true':'false');menuPanel.dataset.open=open?'true':'false';if(open&&menuItems[index||0])menuItems[index||0].focus();else menuToggle.focus()}menuToggle.addEventListener('click',function(){setMenuOpen(!isMenuOpen(),0)});menuToggle.addEventListener('keydown',function(e){if(e.key==='ArrowDown'||e.key==='Enter'||e.key===' '){e.preventDefault();setMenuOpen(true,0)}});menuPanel.addEventListener('keydown',function(e){if(!isMenuOpen())return;const i=menuItems.indexOf(document.activeElement);if(e.key==='ArrowDown'){e.preventDefault();menuItems[(i+1)%menuItems.length].focus()}else if(e.key==='ArrowUp'){e.preventDefault();menuItems[(i-1+menuItems.length)%menuItems.length].focus()}else if(e.key==='Escape'){e.preventDefault();setMenuOpen(false)}});document.addEventListener('click',function(e){if(!menuToggle.contains(e.target)&&!menuPanel.contains(e.target)&&isMenuOpen()){menuToggle.setAttribute('aria-expanded','false');menuPanel.dataset.open='false'}});
+document.querySelectorAll('[data-go-accessible]').forEach(function(link){link.addEventListener('click',function(){try{localStorage.setItem('terminal-console-mode','accessible')}catch(e){}})});loadHistory();try{localStorage.setItem('terminal-console-mode','accessible')}catch(e){}connect();
 })();
 </script>
 </body>
