@@ -2,7 +2,6 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 /**
  * Minimal, secure API exposed to the renderer process.
- * Add new methods only when a concrete requirement appears.
  */
 contextBridge.exposeInMainWorld('accessibleTerminal', {
   /** Display a native message box. */
@@ -13,6 +12,11 @@ contextBridge.exposeInMainWorld('accessibleTerminal', {
   /** Return the port on which the Express backend is listening. */
   getBackendPort: (): Promise<number> => {
     return ipcRenderer.invoke('get-backend-port');
+  },
+
+  /** Open the operating-system folder picker and return the selected path. */
+  chooseWorkingDirectory: (): Promise<string | null> => {
+    return ipcRenderer.invoke('choose-working-directory');
   },
 
   /** Current operating-system platform. */
