@@ -6,7 +6,7 @@
 <title>Interactive Accessible Console</title>
 <style>
 :root{--bg:#0c0c0c;--panel:#161616;--text:#eee;--muted:#aaa;--border:#444;--focus:#4fc1e9;--accent:#1e4d6b}
-*{box-sizing:border-box}body{margin:0;padding:16px;background:var(--panel);color:var(--text);font-family:Segoe UI,system-ui,sans-serif}main{max-width:90rem;margin:auto}.panel{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:12px}h1,h2{margin:0 0 8px}h1{font-size:1.25rem}h2{font-size:.9rem;color:var(--muted)}button,input,textarea{font:inherit}button{background:#292929;color:var(--text);border:1px solid var(--border);border-radius:4px;padding:8px 12px}button:focus,input:focus,textarea:focus,#output:focus{outline:2px solid var(--focus);outline-offset:2px}.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.toolbar button.primary{background:var(--accent)}#status{color:var(--muted)}#status[data-state=connected]{color:#89d185}#status[data-state=error]{color:#f48771}#output{width:100%;height:52vh;min-height:300px;background:#000;color:var(--text);border:1px solid var(--border);padding:12px;font:16px/1.4 Consolas,"Courier New",monospace;white-space:pre-wrap;overflow:auto;resize:vertical}#output .terminal-line{min-height:1.4em;white-space:pre-wrap;overflow-wrap:anywhere}#input{width:100%;height:9rem;background:#000;color:var(--text);border:1px solid var(--border);padding:10px;font:16px/1.4 Consolas,"Courier New",monospace;resize:vertical}.help{color:var(--muted);font-size:.92rem;line-height:1.5}kbd{background:#1b1b1b;border:1px solid var(--border);border-radius:3px;padding:1px 5px}.visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.row label{color:var(--muted)}#cwd{flex:1;min-width:20rem;background:#000;color:var(--text);border:1px solid var(--border);padding:8px}
+*{box-sizing:border-box}body{margin:0;padding:16px;background:var(--panel);color:var(--text);font-family:Segoe UI,system-ui,sans-serif}main{max-width:90rem;margin:auto}.panel{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:12px}h1,h2{margin:0 0 8px}h1{font-size:1.25rem}h2{font-size:.9rem;color:var(--muted)}button,input,textarea{font:inherit}button{background:#292929;color:var(--text);border:1px solid var(--border);border-radius:4px;padding:8px 12px}button:focus,input:focus,textarea:focus{outline:2px solid var(--focus);outline-offset:2px}.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.toolbar button.primary{background:var(--accent)}#status{color:var(--muted)}#status[data-state=connected]{color:#89d185}#status[data-state=error]{color:#f48771}#output{width:100%;height:52vh;min-height:300px;background:#000;color:var(--text);border:1px solid var(--border);padding:12px;font:16px/1.4 Consolas,"Courier New",monospace;white-space:pre-wrap;overflow:auto;resize:vertical}.output-line{white-space:pre-wrap;overflow-wrap:anywhere;min-height:1.4em}.output-line:focus{outline:2px solid var(--focus);outline-offset:1px}.help{color:var(--muted);font-size:.92rem;line-height:1.5}kbd{background:#1b1b1b;border:1px solid var(--border);border-radius:3px;padding:1px 5px}.visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.row label{color:var(--muted)}#cwd{flex:1;min-width:20rem;background:#000;color:var(--text);border:1px solid var(--border);padding:8px}
 </style>
 </head>
 <body>
@@ -14,12 +14,15 @@
 <section class="panel">
 <h1>Interactive Accessible Console</h1>
 <p id="status" data-state="connecting" aria-live="polite">Connecting to the PTY...</p>
-<p class="help">This mode sends keyboard input directly to the real PowerShell PTY. It is intended for interactive programs such as Python, SSH, git add -p, and terminal editors. Output is exposed as individual accessible lines so screen readers and Braille displays can navigate the terminal buffer more reliably.</p>
+<p class="help">This mode sends keyboard input directly to the real PowerShell PTY. It is intended for interactive programs such as Python, SSH, git add -p, and terminal editors. The output is presented as individual accessible lines for screen readers and Braille displays.</p>
 </section>
 <section class="panel" aria-labelledby="out-heading">
 <h2 id="out-heading">Terminal output</h2>
-<div id="output" role="log" aria-live="polite" aria-relevant="additions text" aria-label="Interactive terminal output" tabindex="0"></div>
-<p class="help">Focus this output area to review terminal lines with your screen reader or Braille display. New output is added as separate accessible lines instead of replacing one large text field.</p>
+<div id="output" role="log" aria-live="polite" aria-relevant="additions text" aria-label="Interactive terminal output"></div>
+<div class="toolbar">
+<button type="button" id="latest">Read latest output</button>
+<button type="button" id="clear">Clear output view</button>
+</div>
 </section>
 <section class="panel" aria-labelledby="input-heading">
 <h2 id="input-heading">Interactive keyboard input</h2>
@@ -28,65 +31,56 @@
 <div class="toolbar">
 <button type="button" id="interrupt" disabled>Send Ctrl+C (interrupt)</button>
 <button type="button" id="eof" disabled>Send Ctrl+D (EOF)</button>
-<button type="button" id="clear">Clear output view</button>
-<button type="button" id="read-latest">Read latest output</button>
 <button type="button" id="clear-input">Clear input field</button>
 <button type="button" id="focus">Focus input</button>
 </div>
 </section>
 <section class="panel" aria-labelledby="cwd-heading">
-<h2 id="cwd-heading">Working directory</h2>
+<h2 id="cwd-heading">Working Directory</h2>
 <div class="row">
-<label for="cwd">Directory</label><input id="cwd" type="text" autocomplete="off" spellcheck="false"><button type="button" id="set-cwd">Set directory</button>
+<label for="cwd">Full path</label><input id="cwd" type="text" autocomplete="off" spellcheck="false" placeholder="Example: C:\Users\YourName\Documents"><button type="button" id="set-cwd">Set directory</button>
 </div>
+<p class="help">Enter the complete Windows path. For example: <code>C:\Users\YourName\Documents</code>. You do not need to use <code>~</code>. The <code>~</code> symbol is a shortcut commonly used for a user's home directory.</p>
 </section>
 <div id="announce" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
 </main>
 <script>
 (function(){
-const output=document.getElementById('output'), input=document.getElementById('input'), status=document.getElementById('status'), announceBox=document.getElementById('announce'), interrupt=document.getElementById('interrupt'), eof=document.getElementById('eof'), clear=document.getElementById('clear'), readLatest=document.getElementById('read-latest'), clearInput=document.getElementById('clear-input'), focus=document.getElementById('focus'), cwd=document.getElementById('cwd'), setCwd=document.getElementById('set-cwd');
-let ws=null, connected=false, currentLine=null, lineCount=0;
-const MAX_LINES=2000;
+const output=document.getElementById('output'), input=document.getElementById('input'), status=document.getElementById('status'), announceBox=document.getElementById('announce'), interrupt=document.getElementById('interrupt'), eof=document.getElementById('eof'), latest=document.getElementById('latest'), clear=document.getElementById('clear'), clearInput=document.getElementById('clear-input'), focus=document.getElementById('focus'), cwd=document.getElementById('cwd'), setCwd=document.getElementById('set-cwd');
+let ws=null, connected=false;
 function announce(text){announceBox.textContent='';setTimeout(()=>announceBox.textContent=text,30)}
 function setStatus(text,state){status.textContent=text;status.dataset.state=state||''}
 function send(text){if(ws&&ws.readyState===WebSocket.OPEN){ws.send(text);return true}announce('Terminal is not connected.');return false}
 function sendKey(key,event){
  if(event.ctrlKey){const k=event.key.toLowerCase();if(k>='a'&&k<='z'){event.preventDefault();send(String.fromCharCode(k.charCodeAt(0)-96));if(['c','d','l'].includes(k))input.value='';return true}}
  const map={Enter:'\r',Tab:'\t',Backspace:'\x7f',Escape:'\x1b',ArrowUp:'\x1b[A',ArrowDown:'\x1b[B',ArrowRight:'\x1b[C',ArrowLeft:'\x1b[D',Home:'\x1b[H',End:'\x1b[F',PageUp:'\x1b[5~',PageDown:'\x1b[6~',Delete:'\x1b[3~'};
- if(map[key]!==undefined){event.preventDefault();send(map[key]);if(key==='Enter'||key==='Tab'||key==='Escape'||key.startsWith('Arrow')||key==='Home'||key==='End'||key==='PageUp'||key==='PageDown')input.value='';return true}
- if(key.length===1&&!event.altKey&&!event.metaKey){send(key);return true}
+ if(map[key]!==undefined){event.preventDefault();send(map[key]);if(key==='Enter'||key==='Tab'||key==='Escape'||key==='ArrowUp'||key==='ArrowDown'||key==='ArrowLeft'||key==='ArrowRight'||key==='Home'||key==='End'||key==='PageUp'||key==='PageDown')input.value='';return true}
+ if(key.length===1 && !event.altKey && !event.metaKey){send(key);return true}
  return false;
 }
 function appendOutput(text){
- const cleaned=cleanAnsi(text).replace(/\r\n/g,'\n').replace(/\r/g,'\n');
- if(!cleaned)return;
- const parts=cleaned.split('\n');
- parts.forEach((part,index)=>{
-  if(!currentLine){currentLine=document.createElement('div');currentLine.className='terminal-line';currentLine.setAttribute('role','listitem');output.appendChild(currentLine);lineCount++}
-  if(part)currentLine.textContent+=part;
-  if(index<parts.length-1){currentLine=null}
- });
- while(lineCount>MAX_LINES&&output.firstElementChild){output.removeChild(output.firstElementChild);lineCount--}
+ const cleaned=cleanAnsi(text);if(!cleaned)return;
+ const parts=cleaned.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+ parts.forEach((line,index)=>{if(index===parts.length-1 && line==='')return;const el=document.createElement('div');el.className='output-line';el.tabIndex=0;el.setAttribute('role','log');el.textContent=line||' ';output.appendChild(el)});
+ while(output.children.length>2000)output.removeChild(output.firstChild);
  output.scrollTop=output.scrollHeight;
 }
-function latestText(){const lines=Array.from(output.querySelectorAll('.terminal-line')).slice(-8).map(el=>el.textContent||'');return lines.join('\n').trim()}
 function connect(){
  const protocol=location.protocol==='https:'?'wss://':'ws://';ws=new WebSocket(protocol+location.host+'/ws');
  ws.addEventListener('open',()=>{connected=true;input.disabled=false;interrupt.disabled=false;eof.disabled=false;setStatus('Connected to the Windows PowerShell PTY.','connected');let saved='';try{saved=localStorage.getItem('terminal-last-path')||''}catch{};cwd.value=saved;send(JSON.stringify({type:'cwd',cwd:saved,mode:'accessible'}));announce('Interactive console connected. Keyboard input is ready.');input.focus()});
- ws.addEventListener('message',e=>{const text=typeof e.data==='string'?e.data:String(e.data);appendOutput(text)});
+ ws.addEventListener('message',e=>{const text=typeof e.data==='string'?e.data:String(e.data);appendOutput(text);});
  ws.addEventListener('close',()=>{connected=false;input.disabled=true;interrupt.disabled=true;eof.disabled=true;setStatus('Terminal connection closed.','error');announce('Terminal connection closed.')});
  ws.addEventListener('error',()=>{setStatus('Could not connect to the terminal.','error');announce('Could not connect to the terminal.')});
 }
 function cleanAnsi(text){return text.replace(/\x1b\[[0-?]*[ -\/]*[@-~]/g,'').replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g,'').replace(/\x1b\][^\x1b]*(?:\x1b\\)?/g,'')}
-input.addEventListener('keydown',e=>sendKey(e.key,e));
+input.addEventListener('keydown',e=>{sendKey(e.key,e)});
 interrupt.addEventListener('click',()=>{send('\x03');input.value='';input.focus();announce('Ctrl+C sent to the PTY to interrupt the running program.')});
 eof.addEventListener('click',()=>{send('\x04');input.value='';input.focus();announce('Ctrl+D sent to the PTY as end of file.')});
-clear.addEventListener('click',()=>{output.replaceChildren();currentLine=null;lineCount=0;input.focus();announce('Output view cleared.')});
-readLatest.addEventListener('click',()=>{const text=latestText();announce(text||'There is no terminal output to read.')});
+latest.addEventListener('click',()=>{const lines=output.querySelectorAll('.output-line');if(!lines.length){announce('There is no terminal output.');return}const last=lines[lines.length-1];last.focus();announce('Latest terminal output: '+last.textContent)});
+clear.addEventListener('click',()=>{output.replaceChildren();input.focus();announce('Output view cleared.')});
 clearInput.addEventListener('click',()=>{input.value='';input.focus();announce('Input field cleared.')});
 focus.addEventListener('click',()=>input.focus());
-output.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();input.focus();announce('Returned to interactive keyboard input.')}});
-setCwd.addEventListener('click',()=>{const value=cwd.value.trim();if(!value)return;try{localStorage.setItem('terminal-last-path',value)}catch{};send(JSON.stringify({type:'cwd',cwd:value,mode:'accessible'}));input.focus();announce('Working directory change requested.')});
+setCwd.addEventListener('click',()=>{const value=cwd.value.trim();if(!value)return;try{localStorage.setItem('terminal-last-path',value)}catch{};send(JSON.stringify({type:'cwd',cwd:value,mode:'accessible'}));input.focus();announce('Working directory change requested for '+value)});
 cwd.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();setCwd.click()}});
 window.addEventListener('beforeunload',()=>{try{localStorage.setItem('terminal-last-path',cwd.value)}catch{};if(ws)ws.close()});
 connect();
