@@ -8,7 +8,7 @@ A simple browser shell built for screen readers. Three clear regions:
 
 No canvas terminal grid. Screen readers can tab between path, output, and the command box like any other form.
 
-Backend is TypeScript (`src/server.ts`); frontend is plain HTML/JS (`public/index.html`). Each browser connection gets a real PowerShell process via `node-pty` over a WebSocket.
+Backend is TypeScript (`src/server.ts`); frontend is plain HTML/JS (`public/index.html`). Terminal views share a single `node-pty` PowerShell session over WebSocket.
 
 ## Requirements
 
@@ -29,12 +29,27 @@ npm run dev
 
 Open **http://localhost:3000**.
 
+The default page is now the combined terminal view. It lets you switch between Full Console and Accessible Terminal while keeping the same PowerShell session.
+
 Production-style:
 
 ```bash
 npm run build
 npm start
 ```
+
+## Combined terminal views
+
+The combined page provides two interfaces over the same PowerShell process:
+
+- **Accessible Terminal** — normal HTML controls and output designed for JAWS/NVDA and other screen readers.
+- **Full Console** — xterm.js for a traditional interactive terminal experience.
+
+Use the **Accessible Terminal** view for screen-reader navigation and the **Full Console** view when you want the richer terminal emulator experience. Switching views does not start a second PowerShell process.
+
+The shared terminal session is associated with a browser session cookie. If both views are open, output and commands are sent to the same PTY and broadcast to both views.
+
+The Full Console continues to use xterm.js rather than trying to make xterm.js the only accessibility interface. This keeps the HTML interface available as the screen-reader-friendly path.
 
 ## Desktop application (Electron)
 
@@ -167,11 +182,11 @@ Open **Settings → Natural language shell (nlsh / Ollama)**. The application ca
 ## How to use (screen reader)
 
 1. When the page loads, wait for “Shell ready” / “Connected to PowerShell.”
-2. Focus lands on the **Command** field.
+2. Focus lands on the **Command** field in the Accessible Terminal view.
 3. Type a command (for example `Get-Date` or `Get-ChildItem`) and press **Enter**.
 4. A short status is announced when the command finishes (succeeded or failed).
 5. Press **Alt+O** (or “Go to output”) to read results in the output box with browse mode / the virtual cursor.
-6. Press **Alt+C** to return to the command field.
+6. Use the **Full Console** button when you want the xterm.js interface.
 
 ### Keyboard
 
