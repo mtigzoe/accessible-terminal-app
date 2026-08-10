@@ -30,6 +30,8 @@ button:focus,input:focus,textarea:focus,.output-line:focus{outline:2px solid var
 .ansi-fg-94{color:#3b8eea}.ansi-fg-95{color:#d670d6}.ansi-fg-96{color:#29b8db}.ansi-fg-97{color:#fff}
 .help{color:var(--muted);font-size:.92rem;line-height:1.5;margin:8px 0 0}
 .visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.visually-hidden-focusable{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.visually-hidden-focusable:focus{position:static;width:auto;height:auto;overflow:visible;clip:auto;white-space:normal}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .row label{color:var(--muted)}
 #cwd{flex:1;min-width:20rem;background:#000;color:var(--text);border:1px solid var(--border);padding:8px}
@@ -46,6 +48,9 @@ kbd{font-family:Consolas,"Courier New",monospace;background:#222;border:1px soli
 <a class="skip-link" href="#input">Skip to interactive keyboard input</a>
 <a class="skip-link" href="#output">Skip to terminal output</a>
 <main id="main" role="main" aria-labelledby="page-title">
+<div class="row" style="justify-content:flex-end">
+  <a href="console.html" class="visually-hidden-focusable" style="color:var(--accent)">Switch to visual terminal mode (xterm.js)</a>
+</div>
 <section class="panel" aria-labelledby="page-title">
 <h1 id="page-title">Interactive Accessible Console</h1>
 <p id="status" data-state="connecting" role="status" aria-live="polite" aria-atomic="true">Connecting to the PTY…</p>

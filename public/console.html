@@ -252,45 +252,58 @@ function handleLocalInput(data){
 
 /** Shared shortcut handler. Returns true if the event was handled. */
 function handleAppShortcut(e){
-  if(!e.altKey||e.ctrlKey||e.metaKey)return false;
-  if(!buffer.hidden)return false;
-  const key=e.key;
-  const code=e.code;
-  const lower=typeof key==='string'?key.toLowerCase():'';
-  if(key==='F2'||code==='F2'||lower==='b'){
-    e.preventDefault();
-    e.stopPropagation();
-    openBuffer();
-    return true;
+  if(e.altKey||e.ctrlKey||e.metaKey){
+    if(!buffer.hidden)return false;
+    const key=e.key;
+    const code=e.code;
+    const lower=typeof key==='string'?key.toLowerCase():'';
+    if(key==='F2'||code==='F2'||lower==='b'){
+      e.preventDefault();
+      e.stopPropagation();
+      openBuffer();
+      return true;
+    }
+    if(lower==='t'){
+      e.preventDefault();
+      e.stopPropagation();
+      if(term){term.focus();announce('Terminal focused.')}
+      return true;
+    }
+    if(lower==='m'){
+      e.preventDefault();
+      e.stopPropagation();
+      if(isMenuOpen())setMenuOpen(false);else setMenuOpen(true,0);
+      return true;
+    }
+    if(lower==='enter'||key==='Enter'){
+      e.preventDefault();
+      e.stopPropagation();
+      send('\r');
+      if(term)term.focus();
+      announce('Enter sent.');
+      return true;
+    }
+    if(lower==='i'){
+      e.preventDefault();
+      e.stopPropagation();
+      send('\x03');
+      typedDraft='';
+      if(term)term.focus();
+      announce('Ctrl+C sent.');
+      return true;
+    }
+    return false;
   }
-  if(lower==='t'){
+  if(buffer.hidden && e.key==='Tab'){
     e.preventDefault();
     e.stopPropagation();
-    if(term){term.focus();announce('Terminal focused.')}
-    return true;
-  }
-  if(lower==='m'){
-    e.preventDefault();
-    e.stopPropagation();
-    if(isMenuOpen())setMenuOpen(false);else setMenuOpen(true,0);
-    return true;
-  }
-  if(lower==='enter'||key==='Enter'){
-    e.preventDefault();
-    e.stopPropagation();
-    send('\r');
-    if(term)term.focus();
-    announce('Enter sent.');
-    return true;
-  }
-  if(lower==='i'){
-    e.preventDefault();
-    e.stopPropagation();
-    send('\x03');
-    typedDraft='';
-    if(term)term.focus();
-    announce('Ctrl+C sent.');
-    return true;
+    const focusable=getFocusable(document.body).filter(function(el){return el!==terminalHost && el!==term.textarea&&typeof el.focus==='function'});
+    if(!focusable.length)return false;
+    const current=document.activeElement;
+    const idx=focusable.indexOf(current);
+    const next=idx<0||idx>=focusable.length-1?focusable[0]:focusable[idx+1];
+    try{next.focus()}catch(err){}
+    return false;
   }
   return false;
 }
@@ -308,10 +321,14 @@ document.addEventListener('click',function(event){if(!menuToggle.contains(event.
 /** Capture terminal buffer into a JS array only — never dump the full text into the DOM. */
 function captureLines(){
   if(!term)return[];
-  const b=term.buffer.active,lines=[];
-  for(let i=0;i<b.length;i++){
-    const line=b.getLine(i);
-    lines.push(line?line.translateToString(true):'');
+  let b=term.buffer&&term.buffer.active?term.buffer.active:null;
+  if(!b&&term.buffer&&term.buffer.lines)b=term.buffer;
+  if(!b)return[];
+  const lines=[];
+  const len=typeof b.length==='number'?b.length:0;
+  for(let i=0;i<len;i++){
+    const line=b.getLine?b.getLine(i):null;
+    lines.push(line?line.translateToString?line.translateToString(true):String(line):'');
   }
   while(lines.length&&lines[lines.length-1]==='')lines.pop();
   return lines;
@@ -365,7 +382,6 @@ function loadBufferFromTerminal(){
 
 function openBuffer(){
   lastFocused=document.activeElement;
-  // Pause live terminal speech; buffer navigation owns announcements
   suppressOutputSpeech=true;
   if(outputFlushTimer){clearTimeout(outputFlushTimer);outputFlushTimer=null}
   outputPending='';
@@ -375,15 +391,21 @@ function openBuffer(){
   buffer.hidden=false;
   lineIndex=0;
   updateLineView(0,lines.length,!lines.length);
-  // Focus a small control so the SR never lands on a large text region
   const firstBtn=document.getElementById('buffer-first');
   if(firstBtn)firstBtn.focus();
   if(!lines.length){
     announce('Buffer opened. Empty.');
   }else{
-    // Open summary only — do not dump all lines. User navigates line-by-line next.
     announce('Buffer opened. '+lines.length+' lines. First line: '+displayLine(lines[0]));
   }
+  // Ensure buffer is visible after paint
+  setTimeout(function(){
+    buffer.hidden=false;
+    buffer.style.display='block';
+    if(firstBtn)firstBtn.focus();
+    refreshBuffer({force:true,silent:true});
+  }, 50);
+  setTimeout(function(){refreshBuffer({force:true,silent:true})}, 250);
 }
 
 function closeBuffer(){
@@ -522,10 +544,10 @@ function init(){
     announce('xterm.js could not be loaded.',true);
     return;
   }
-  // Keep xterm's built-in SR layer off by default — we own announcements.
-  // Users may still enable it in Settings (experimental); our announcer still runs.
-  let screenReaderMode=false;
-  try{screenReaderMode=localStorage.getItem('terminal-sr-mode')==='true'}catch(e){}
+  // Force xterm's built-in SR layer off — our accessible buffer and announcements own screen-reader output.
+  // The Settings toggle remains available, but this terminal intentionally ignores it to avoid
+  // duplicate or conflicting SR behavior ("Too much info?" / xterm live regions).
+  const screenReaderMode=false;
   term=new Terminal({
     cursorBlink:true,convertEol:true,scrollback:5000,
     fontFamily:'Consolas, "Courier New", monospace',fontSize:14,
