@@ -221,6 +221,9 @@ function handleLocalInput(data){
         announce('Enter');
       }
       typedDraft='';
+    }else if(code===9){
+      // Tab is used for shell completion; announce it so the keystroke is not silent.
+      announce('Tab');
     }else if(code===127||code===8){
       if(typedDraft.length){
         typedDraft=typedDraft.slice(0,-1);
@@ -295,15 +298,22 @@ function handleAppShortcut(e){
     return false;
   }
   if(buffer.hidden && e.key==='Tab'){
+    // Allow Tab to reach the PTY for shell completions when the terminal has focus.
+    // Only intercept Tab for page focus cycling when focus is outside the terminal.
+    const active=document.activeElement;
+    const inTerminal=!!(term&&(active===terminalHost||active===term.textarea||(terminalHost&&terminalHost.contains(active))));
+    if(inTerminal){
+      return false; // do not preventDefault; let xterm/onData deliver Tab to the shell
+    }
     e.preventDefault();
     e.stopPropagation();
-    const focusable=getFocusable(document.body).filter(function(el){return el!==terminalHost && el!==term.textarea&&typeof el.focus==='function'});
+    const focusable=getFocusable(document.body).filter(function(el){return el!==terminalHost && !(term&&el===term.textarea)&&typeof el.focus==='function'});
     if(!focusable.length)return false;
     const current=document.activeElement;
     const idx=focusable.indexOf(current);
     const next=idx<0||idx>=focusable.length-1?focusable[0]:focusable[idx+1];
     try{next.focus()}catch(err){}
-    return false;
+    return true;
   }
   return false;
 }
@@ -321,15 +331,36 @@ document.addEventListener('click',function(event){if(!menuToggle.contains(event.
 /** Capture terminal buffer into a JS array only — never dump the full text into the DOM. */
 function captureLines(){
   if(!term)return[];
-  let b=term.buffer&&term.buffer.active?term.buffer.active:null;
-  if(!b&&term.buffer&&term.buffer.lines)b=term.buffer;
+  let b=null;
+  try{
+    if(term.buffer&&term.buffer.active)b=term.buffer.active;
+    else if(term.buffer)b=term.buffer;
+  }catch(err){}
   if(!b)return[];
   const lines=[];
-  const len=typeof b.length==='number'?b.length:0;
-  for(let i=0;i<len;i++){
-    const line=b.getLine?b.getLine(i):null;
-    lines.push(line?line.translateToString?line.translateToString(true):String(line):'');
+  let len=0;
+  try{len=typeof b.length==='number'?b.length:0}catch(err){}
+  // Prefer full scrollback+viewport via getLine when available.
+  if(typeof b.getLine==='function'&&len>0){
+    for(let i=0;i<len;i++){
+      let text='';
+      try{
+        const line=b.getLine(i);
+        if(line){
+          if(typeof line.translateToString==='function')text=line.translateToString(true);
+          else text=String(line);
+        }
+      }catch(err){}
+      lines.push(text);
+    }
+  }else if(b.lines&&typeof b.lines.length==='number'){
+    // Fallback for older buffer shapes
+    for(let i=0;i<b.lines.length;i++){
+      const line=b.lines.get?b.lines.get(i):b.lines[i];
+      lines.push(line&&line.translateToString?line.translateToString(true):'');
+    }
   }
+  // Drop trailing blank lines that are only padding in the buffer
   while(lines.length&&lines[lines.length-1]==='')lines.pop();
   return lines;
 }
