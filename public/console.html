@@ -1,48 +1,306 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Accessible console — Accessible Terminal</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Full Console — Accessible Terminal</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css">
+<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js"></script>
 <style>
-:root{--bg:#0c0c0c;--panel:#161616;--text:#e6e6e6;--muted:#a0a0a0;--accent:#4fc1e9;--border:#333;--focus:#4fc1e9;--error:#f48771}
-*{box-sizing:border-box}body{margin:0;padding:12px;padding-top:56px;background:var(--panel);color:var(--text);font-family:"Segoe UI",system-ui,sans-serif;min-height:100vh}
-.app-menu{position:fixed;top:12px;left:12px;z-index:100}.menu-toggle,.actions button,.toolbar button{background:#2a2a2a;color:var(--text);border:1px solid var(--border);border-radius:4px;padding:8px 12px;cursor:pointer;font-size:.95rem;font-family:inherit}.menu-toggle:focus,button:focus,input:focus,textarea:focus,a:focus{outline:2px solid var(--focus);outline-offset:2px}.menu-toggle[aria-expanded="true"],button:hover{border-color:var(--accent)}
-.menu-panel{display:none;position:absolute;top:100%;left:0;margin:4px 0 0;min-width:13rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 0;list-style:none;box-shadow:0 6px 20px rgba(0,0,0,.45)}.menu-panel[data-open="true"]{display:block}.menu-panel a{display:block;padding:8px 14px;color:var(--text);text-decoration:none}.menu-panel a:hover,.menu-panel a:focus{background:#1e4d6b;outline:none}
-main{max-width:72rem;margin:0 auto}.panel{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:14px 16px;margin-bottom:12px}.panel h1,.panel h2{margin:0 0 8px}.panel h1{font-size:1.2rem}.panel h2{font-size:.85rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
-#status-line{margin:0;color:var(--muted)}#status-line[data-state="connected"]{color:#89d185}#status-line[data-state="error"]{color:var(--error)}
-#output{width:100%;min-height:50vh;height:50vh;resize:vertical;background:#000;color:var(--text);border:1px solid var(--border);border-radius:4px;padding:12px;font-family:Consolas,"Courier New",monospace;font-size:1rem;line-height:1.4;white-space:pre;overflow:auto}
-.command-row{display:flex;gap:10px;align-items:flex-end}.command-field{flex:1 1 auto;min-width:12rem}.command-label{display:block;color:var(--muted);margin-bottom:5px;font-size:.9rem}#command,#cwd{width:100%;background:#000;color:var(--text);border:1px solid var(--border);border-radius:4px;padding:10px 12px;font-family:Consolas,"Courier New",monospace;font-size:1rem}.actions{display:flex;gap:8px;flex-wrap:wrap}.actions .primary{background:#1e4d6b;border-color:#2a6a90}.toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.toolbar button{padding:7px 10px}.help{margin:10px 0 0;color:var(--muted);font-size:.9rem}kbd{border:1px solid var(--border);border-radius:3px;padding:1px 5px;background:#1b1b1b;color:var(--text)}
-#completion-status{min-height:1.3em;margin:8px 0 0;color:var(--muted)}.visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+:root{--bg:#0c0c0c;--panel:#161616;--text:#e6e6e6;--muted:#aaa;--accent:#4fc1e9;--border:#444;--focus:#4fc1e9;--menu-hover:#1e4d6b}
+*{box-sizing:border-box}
+body{margin:0;padding:12px;padding-top:56px;background:var(--panel);color:var(--text);font-family:"Segoe UI",system-ui,sans-serif;height:100vh}
+#main-view{display:contents}
+.app-menu{position:fixed;top:12px;left:12px;z-index:100}
+.menu-toggle,button{background:#2a2a2a;color:var(--text);border:1px solid var(--border);border-radius:4px;padding:8px 12px;font:inherit;cursor:pointer}
+.menu-toggle:focus,button:focus,a:focus,input:focus,textarea:focus{outline:2px solid var(--focus);outline-offset:2px}
+.menu-panel{display:none;position:absolute;top:100%;left:0;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 0;min-width:14rem;list-style:none;margin:4px 0 0;z-index:110;box-shadow:0 4px 12px rgba(0,0,0,.45)}
+.menu-panel[data-open="true"]{display:block}
+.menu-panel a{display:block;padding:8px 12px;color:var(--text);text-decoration:none;outline:none}
+.menu-panel a:hover,.menu-panel a:focus{background:var(--menu-hover)}
+.menu-panel a[aria-current="page"]{font-weight:600}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.toolbar .status{color:var(--muted);flex:1;min-width:12rem}
+.primary{background:#1e4d6b}
+.visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+#terminal{height:calc(100vh - 108px);background:#000;border:1px solid var(--border);border-radius:6px;padding:4px}
+#accessible-buffer[hidden]{display:none}
+#accessible-buffer{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.9);padding:20px}
+#accessible-buffer .panel{height:100%;display:flex;flex-direction:column;background:var(--bg);border:1px solid var(--border);padding:14px;border-radius:6px}
+#buffer-help{color:var(--muted);margin:0 0 8px}
+#buffer-position{color:var(--muted);margin:0 0 10px;font-size:.95rem}
+#buffer-text{flex:1;width:100%;resize:none;background:#000;color:var(--text);border:1px solid var(--border);padding:10px;font:16px/1.4 Consolas,"Courier New",monospace}
+#accessible-buffer .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+#accessible-buffer .row label{color:var(--muted)}
+#buffer-search{background:#000;color:var(--text);border:1px solid var(--border);padding:8px;flex:1;min-width:10rem;font:inherit}
+[inert]{pointer-events:none}
+.skip-link{position:absolute;left:-9999px;top:0;z-index:300;padding:8px 12px;background:var(--bg);color:var(--text);border:2px solid var(--focus)}
+.skip-link:focus{left:16px;top:16px}
+kbd{font-family:Consolas,"Courier New",monospace;background:#222;border:1px solid var(--border);border-radius:3px;padding:1px 5px;font-size:.9em}
+.shortcuts-help{color:var(--muted);font-size:.88rem;margin:0 0 8px}
 </style>
 </head>
 <body>
-<nav class="app-menu" aria-label="Main menu"><button type="button" class="menu-toggle" id="menu-toggle" aria-expanded="false" aria-controls="menu-panel" aria-haspopup="menu">Menu</button><ul class="menu-panel" id="menu-panel" role="menu" data-open="false"><li role="none"><a role="menuitem" href="index.html" tabindex="-1" data-go-accessible>Accessible terminal</a></li><li role="none"><a role="menuitem" href="console.html" aria-current="page" tabindex="-1">Accessible console</a></li><li role="none"><a role="menuitem" href="instructions.html" tabindex="-1">Instructions</a></li><li role="none"><a role="menuitem" href="settings.html" tabindex="-1">Settings</a></li></ul></nav>
-<main>
-<section class="panel" aria-labelledby="title"><h1 id="title">Accessible console</h1><p id="status-line" aria-live="polite" data-state="connecting">Connecting to the PowerShell PTY…</p></section>
-<section class="panel" aria-labelledby="output-heading"><h2 id="output-heading">Command output</h2><textarea id="output" readonly spellcheck="false" aria-label="Command output, read-only"></textarea><div class="toolbar" aria-label="Output actions"><button type="button" id="read-output-btn">Read latest output</button><button type="button" id="copy-output-btn">Copy output</button><button type="button" id="save-output-btn">Save output</button><button type="button" id="clear-btn">Clear output</button></div></section>
-<section class="panel" aria-labelledby="command-heading"><form id="command-form" class="command-row"><div class="command-field"><label id="command-heading" class="command-label" for="command">Command</label><input id="command" type="text" autocomplete="off" spellcheck="false" aria-describedby="command-help completion-status" disabled></div><div class="actions"><button type="submit" class="primary" id="run-btn" disabled>Run</button><button type="button" id="interrupt-btn" disabled>Ctrl+C</button></div></form><p id="completion-status" aria-live="polite"></p><p id="command-help" class="help">Press <kbd>Enter</kbd> to run. <kbd>Up</kbd>/<kbd>Down</kbd> browse history. <kbd>Tab</kbd> requests PowerShell completion. <kbd>Ctrl+C</kbd> interrupts. <kbd>Ctrl+L</kbd> clears the view. <kbd>Escape</kbd> clears the command.</p></section>
-<section class="panel" aria-labelledby="directory-heading"><h2 id="directory-heading">Working directory</h2><label class="command-label" for="cwd">Directory</label><div class="command-row"><div class="command-field"><input id="cwd" type="text" autocomplete="off" spellcheck="false" aria-describedby="cwd-help"></div><div class="actions"><button type="button" id="set-cwd-btn">Set directory</button><button type="button" id="home-cwd-btn">Home</button></div></div><p id="cwd-help" class="help">Changing this directory changes the current PowerShell location. The last directory is remembered on this computer.</p></section>
-</main>
-<div id="sr-status" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div><div id="sr-alert" class="visually-hidden" role="alert" aria-live="assertive" aria-atomic="true"></div>
+<a class="skip-link" href="#terminal">Skip to terminal</a>
+<a class="skip-link" href="#open-buffer">Skip to accessible buffer button</a>
+<div id="main-view">
+<nav class="app-menu" aria-label="Main menu">
+<button id="menu-toggle" type="button" aria-expanded="false" aria-controls="menu-panel" aria-haspopup="menu">Menu</button>
+<ul id="menu-panel" class="menu-panel" role="menu" data-open="false" hidden>
+<li role="none"><a role="menuitem" href="interactive_console.html" tabindex="-1">Interactive console</a></li>
+<li role="none"><a role="menuitem" href="console.html" aria-current="page" tabindex="-1">Full Console</a></li>
+<li role="none"><a role="menuitem" href="instructions.html" tabindex="-1">Instructions</a></li>
+<li role="none"><a role="menuitem" href="settings.html" tabindex="-1">Settings</a></li>
+</ul>
+</nav>
+<div class="toolbar" role="toolbar" aria-label="Full console actions">
+<button id="open-buffer" type="button" class="primary" title="Alt+F2 or Alt+B">Open accessible buffer</button>
+<button id="send-enter" type="button" title="Alt+Enter">Send Enter</button>
+<button id="send-ctrl-c" type="button" title="Alt+I">Send Ctrl+C</button>
+<button id="clear" type="button">Clear screen</button>
+<button id="accessible-mode" type="button">Switch to Interactive Console</button>
+<span id="status" class="status" role="status" aria-live="polite" aria-atomic="true">Connecting…</span>
+</div>
+<p class="shortcuts-help" id="shortcuts-help">Shortcuts: <kbd>Alt+F2</kbd> or <kbd>Alt+B</kbd> accessible buffer, <kbd>Alt+T</kbd> terminal, <kbd>Alt+M</kbd> menu, <kbd>Alt+Enter</kbd> Enter, <kbd>Alt+I</kbd> Ctrl+C, <kbd>Escape</kbd> close buffer.</p>
+<div id="terminal" aria-label="Terminal"></div>
+</div>
+<div id="accessible-buffer" hidden role="dialog" aria-modal="true" aria-labelledby="buffer-heading">
+<div class="panel">
+<h1 id="buffer-heading">Accessible terminal buffer</h1>
+<p id="buffer-help">Use First, Previous, Next, and Last to hear each line. Escape closes.</p>
+<p id="buffer-position" role="status" aria-live="polite" aria-atomic="true">Buffer is empty.</p>
+<textarea id="buffer-text" tabindex="-1" aria-hidden="true" spellcheck="false" readonly></textarea>
+<div class="toolbar" role="group" aria-label="Buffer navigation">
+<button id="buffer-first" type="button">First line</button>
+<button id="buffer-prev" type="button">Previous line</button>
+<button id="buffer-next" type="button">Next line</button>
+<button id="buffer-last" type="button">Last line</button>
+<button id="buffer-refresh" type="button">Refresh buffer</button>
+<button id="buffer-close" type="button">Close buffer</button>
+</div>
+<div class="row" role="search" aria-label="Find in buffer">
+<label for="buffer-search">Find in buffer</label>
+<input id="buffer-search" type="search" autocomplete="off" spellcheck="false" placeholder="Example: error">
+<button id="buffer-find-next" type="button">Find next</button>
+<button id="buffer-find-prev" type="button">Find previous</button>
+</div>
+</div>
+</div>
+<div id="sr-status" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
+<div id="sr-alert" class="visually-hidden" role="alert" aria-live="assertive" aria-atomic="true"></div>
 <script>
 (function(){
-const menuToggle=document.getElementById('menu-toggle'),menuPanel=document.getElementById('menu-panel'),menuItems=Array.prototype.slice.call(menuPanel.querySelectorAll('[role="menuitem"]'));const output=document.getElementById('output'),command=document.getElementById('command'),form=document.getElementById('command-form'),runBtn=document.getElementById('run-btn'),interruptBtn=document.getElementById('interrupt-btn'),clearBtn=document.getElementById('clear-btn'),readBtn=document.getElementById('read-output-btn'),copyBtn=document.getElementById('copy-output-btn'),saveBtn=document.getElementById('save-output-btn'),cwd=document.getElementById('cwd'),setCwdBtn=document.getElementById('set-cwd-btn'),homeCwdBtn=document.getElementById('home-cwd-btn'),status=document.getElementById('status-line'),completionStatus=document.getElementById('completion-status'),srStatus=document.getElementById('sr-status'),srAlert=document.getElementById('sr-alert');
-let socket=null,history=[],historyIndex=-1,connected=false,completionMatches=[],completionIndex=0,completionRequest=0;
-function announce(text,assertive){const target=assertive?srAlert:srStatus;target.textContent='';setTimeout(function(){target.textContent=text},40)}function setStatus(text,state){status.textContent=text;status.dataset.state=state||''}function appendOutput(text){if(!text)return;output.value+=text;output.scrollTop=output.scrollHeight}function sendRaw(text){if(socket&&socket.readyState===WebSocket.OPEN){socket.send(text);return true}announce('The terminal is not connected.',true);return false}
-function saveHistory(){try{localStorage.setItem('terminal-command-history',JSON.stringify(history.slice(-200)))}catch(e){}}function loadHistory(){try{const v=JSON.parse(localStorage.getItem('terminal-command-history')||'[]');if(Array.isArray(v))history=v.filter(x=>typeof x==='string').slice(-200)}catch(e){}}
-function setWorkingDirectory(value,announceIt){const text=(value||'').trim();if(!text)return;if(!sendRaw(JSON.stringify({type:'cwd',cwd:text,mode:'accessible'})))return;cwd.value=text;try{localStorage.setItem('terminal-last-path',text)}catch(e){}if(announceIt)announce('Working directory set to '+text)}
-function connect(){const protocol=location.protocol==='https:'?'wss://':'ws://';socket=new WebSocket(protocol+location.host+'/ws');socket.addEventListener('open',function(){connected=true;command.disabled=false;runBtn.disabled=false;interruptBtn.disabled=false;setStatus('Connected to the PowerShell PTY.','connected');let saved='';try{saved=localStorage.getItem('terminal-last-path')||''}catch(e){}if(saved)cwd.value=saved;socket.send(JSON.stringify({type:'cwd',cwd:saved,mode:'accessible'}));announce('Console connected. Command input is ready.');command.focus()});socket.addEventListener('message',function(event){const text=typeof event.data==='string'?event.data:String(event.data);appendOutput(text);const cwdMatch=text.match(/(?:^|\r?\n)(?:PS )?([A-Za-z]:\\[^\r\n>]*|(?:\/[^\r\n$]*)+)\s*>\s*$/m);if(cwdMatch){cwd.value=cwdMatch[1];try{localStorage.setItem('terminal-last-path',cwd.value)}catch(e){}}});socket.addEventListener('close',function(){connected=false;command.disabled=true;runBtn.disabled=true;interruptBtn.disabled=true;setStatus('Terminal connection closed.','error');announce('Terminal connection closed.',true)});socket.addEventListener('error',function(){setStatus('Could not connect to the terminal.','error');announce('Could not connect to the terminal.',true)})}
-function runCommand(value){const text=value.trim();if(!text||!connected)return;if(history.length===0||history[history.length-1]!==text)history.push(text);if(history.length>200)history.shift();saveHistory();historyIndex=-1;completionMatches=[];sendRaw(text+'\r');command.value='';completionStatus.textContent='';announce('Command sent: '+text)}
-async function requestCompletion(){if(!connected)return;const cursor=command.selectionStart===null?command.value.length:command.selectionStart;const id=++completionRequest;completionStatus.textContent='Requesting completion…';try{const r=await fetch('/api/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({line:command.value,cursor:cursor,cwd:cwd.value,id:id})});const data=await r.json();if(id!==completionRequest)return;if(data.error&&!data.matches.length){completionStatus.textContent='No completion available.';announce('No completion available.');return}completionMatches=Array.isArray(data.matches)?data.matches:[];completionIndex=0;if(!completionMatches.length){completionStatus.textContent='No completion matches.';announce('No completion matches.');return}completionStatus.textContent=completionMatches.length+' completion'+(completionMatches.length===1?'':'s')+' available. Press Tab again to cycle.';applyCompletion(data)}catch(e){completionStatus.textContent='Completion request failed.';announce('Completion request failed.',true)}}
-function applyCompletion(data){if(!completionMatches.length)return;const value=command.value;const start=Math.max(0,Number(data.replacementIndex)||0),length=Math.max(0,Number(data.replacementLength)||0);const match=completionMatches[completionIndex%completionMatches.length];command.value=value.slice(0,start)+match+value.slice(start+length);const pos=start+match.length;command.setSelectionRange(pos,pos);announce('Completion '+((completionIndex%completionMatches.length)+1)+' of '+completionMatches.length+': '+match)}
-function cycleCompletion(){if(!completionMatches.length){requestCompletion();return}completionIndex=(completionIndex+1)%completionMatches.length;completionStatus.textContent=completionMatches.length+' completions available. Showing '+(completionIndex+1)+' of '+completionMatches.length+'.';const token=command.value;const before=token.slice(0,command.selectionStart||token.length);const cursor=command.selectionStart||token.length;const match=before.match(/(?:^|[\s|;])([^\s|;]*)$/);if(!match)return;const start=cursor-match[1].length;const current=completionMatches[completionIndex];command.value=token.slice(0,start)+current+token.slice(cursor);const pos=start+current.length;command.setSelectionRange(pos,pos);announce('Completion '+(completionIndex+1)+' of '+completionMatches.length+': '+current)}
-form.addEventListener('submit',function(e){e.preventDefault();runCommand(command.value)});
-command.addEventListener('keydown',function(e){if(e.key==='Tab'){e.preventDefault();if(completionMatches.length)cycleCompletion();else requestCompletion();return}if(e.key==='ArrowUp'){e.preventDefault();if(!history.length)return;if(historyIndex<history.length-1)historyIndex++;command.value=history[history.length-1-historyIndex]||'';command.setSelectionRange(command.value.length,command.value.length)}else if(e.key==='ArrowDown'){e.preventDefault();if(!history.length)return;if(historyIndex>0){historyIndex--;command.value=history[history.length-1-historyIndex]||''}else{historyIndex=-1;command.value=''}command.setSelectionRange(command.value.length,command.value.length)}else if(e.ctrlKey&&e.key.toLowerCase()==='c'){e.preventDefault();sendRaw('\u0003');announce('Interrupt sent.')}else if(e.ctrlKey&&e.key.toLowerCase()==='l'){e.preventDefault();output.value='';announce('Output view cleared.')}else if(e.key==='Escape'){command.value='';historyIndex=-1;completionMatches=[];completionStatus.textContent='';announce('Command cleared.')}});
-interruptBtn.addEventListener('click',function(){sendRaw('\u0003');command.focus();announce('Interrupt sent.')});clearBtn.addEventListener('click',function(){output.value='';command.focus();announce('Output view cleared.')});readBtn.addEventListener('click',function(){const text=output.value;if(!text){announce('There is no output to read.');return}const latest=text.slice(-3000);announce('Latest output: '+latest);output.focus()});copyBtn.addEventListener('click',async function(){try{await navigator.clipboard.writeText(output.value);announce('Output copied to clipboard.')}catch(e){output.focus();output.select();announce('Output selected. Press Control C to copy.')}});saveBtn.addEventListener('click',function(){const blob=new Blob([output.value],{type:'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='terminal-output.txt';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url)},1000);announce('Output saved as terminal-output.txt.')});
-setCwdBtn.addEventListener('click',function(){setWorkingDirectory(cwd.value,true);command.focus()});cwd.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();setWorkingDirectory(cwd.value,true);command.focus()}});homeCwdBtn.addEventListener('click',function(){setWorkingDirectory('',true);announce('Home directory requested. The server will use the default home directory.');command.focus()});
-function isMenuOpen(){return menuToggle.getAttribute('aria-expanded')==='true'}function setMenuOpen(open,index){menuToggle.setAttribute('aria-expanded',open?'true':'false');menuPanel.dataset.open=open?'true':'false';if(open&&menuItems[index||0])menuItems[index||0].focus();else menuToggle.focus()}menuToggle.addEventListener('click',function(){setMenuOpen(!isMenuOpen(),0)});menuToggle.addEventListener('keydown',function(e){if(e.key==='ArrowDown'||e.key==='Enter'||e.key===' '){e.preventDefault();setMenuOpen(true,0)}});menuPanel.addEventListener('keydown',function(e){if(!isMenuOpen())return;const i=menuItems.indexOf(document.activeElement);if(e.key==='ArrowDown'){e.preventDefault();menuItems[(i+1)%menuItems.length].focus()}else if(e.key==='ArrowUp'){e.preventDefault();menuItems[(i-1+menuItems.length)%menuItems.length].focus()}else if(e.key==='Escape'){e.preventDefault();setMenuOpen(false)}});document.addEventListener('click',function(e){if(!menuToggle.contains(e.target)&&!menuPanel.contains(e.target)&&isMenuOpen()){menuToggle.setAttribute('aria-expanded','false');menuPanel.dataset.open='false'}});
-document.querySelectorAll('[data-go-accessible]').forEach(function(link){link.addEventListener('click',function(){try{localStorage.setItem('terminal-console-mode','accessible')}catch(e){}})});loadHistory();try{localStorage.setItem('terminal-console-mode','accessible')}catch(e){}connect();
+'use strict';
+const status=document.getElementById('status'),sr=document.getElementById('sr-status'),alertBox=document.getElementById('sr-alert'),mainView=document.getElementById('main-view'),buffer=document.getElementById('accessible-buffer'),bufferText=document.getElementById('buffer-text'),bufferPosition=document.getElementById('buffer-position'),bufferSearch=document.getElementById('buffer-search'),menuToggle=document.getElementById('menu-toggle'),menuPanel=document.getElementById('menu-panel'),menuItems=Array.from(menuPanel.querySelectorAll('[role="menuitem"]'));
+let socket=null,term=null,fit=null,autoRefreshTimer=null,lastFocused=null,lineIndex=0;
+
+function createAnnouncer(el){const queue=[];let active=false;const GAP_MS=280;function playNext(){if(queue.length===0){active=false;return}active=true;const text=queue.shift();el.textContent='';window.setTimeout(function(){el.textContent=text;window.setTimeout(playNext,GAP_MS)},40)}return function(text){if(!text)return;queue.push(String(text));while(queue.length>6)queue.shift();if(!active)playNext()}}
+const announcePolite=createAnnouncer(sr),announceAssertive=createAnnouncer(alertBox);
+function announce(text,urgent){if(urgent)announceAssertive(text);else announcePolite(text)}
+
+function isMenuOpen(){return menuToggle.getAttribute('aria-expanded')==='true'}
+function setMenuOpen(open,focusIndex){menuToggle.setAttribute('aria-expanded',open?'true':'false');menuPanel.dataset.open=open?'true':'false';if(open){menuPanel.hidden=false;const index=typeof focusIndex==='number'&&focusIndex>=0&&focusIndex<menuItems.length?focusIndex:0;menuItems[index].focus()}else{menuPanel.hidden=true;menuToggle.focus()}}
+function focusMenuItem(index){if(!menuItems.length)return;const n=menuItems.length,i=((index%n)+n)%n;menuItems[i].focus()}
+function currentMenuIndex(){return menuItems.indexOf(document.activeElement)}
+function activateMenuItem(item){if(item&&item.tagName==='A'&&item.href)window.location.href=item.href}
+menuToggle.addEventListener('click',function(){if(isMenuOpen())setMenuOpen(false);else setMenuOpen(true,0)});
+menuToggle.addEventListener('keydown',function(event){if(event.key==='ArrowDown'||event.key==='Enter'||event.key===' '){event.preventDefault();setMenuOpen(true,0)}else if(event.key==='ArrowUp'){event.preventDefault();setMenuOpen(true,menuItems.length-1)}});
+menuPanel.addEventListener('keydown',function(event){if(!isMenuOpen())return;const idx=currentMenuIndex();switch(event.key){case'ArrowDown':event.preventDefault();focusMenuItem(idx<0?0:idx+1);break;case'ArrowUp':event.preventDefault();focusMenuItem(idx<0?menuItems.length-1:idx-1);break;case'Home':event.preventDefault();focusMenuItem(0);break;case'End':event.preventDefault();focusMenuItem(menuItems.length-1);break;case'Escape':event.preventDefault();setMenuOpen(false);break;case'Tab':setMenuOpen(false);break;case'Enter':case' ':event.preventDefault();activateMenuItem(document.activeElement);break}});
+document.addEventListener('click',function(event){if(!menuToggle.contains(event.target)&&!menuPanel.contains(event.target)){if(isMenuOpen()){menuToggle.setAttribute('aria-expanded','false');menuPanel.dataset.open='false';menuPanel.hidden=true}}});
+
+function capture(){if(!term)return'';const b=term.buffer.active,lines=[];for(let i=0;i<b.length;i++){const line=b.getLine(i);lines.push(line?line.translateToString(true):'')}while(lines.length&&lines[lines.length-1]==='')lines.pop();return lines.join('\n')}
+function getLines(){const raw=bufferText.value;if(!raw||raw==='(Buffer is empty.)')return[];return raw.split('\n')}
+function updatePosition(index,total,isEmpty){bufferPosition.textContent=isEmpty?'Buffer is empty.':('Line '+(index+1)+' of '+total+'.')}
+function getFocusable(container){return Array.from(container.querySelectorAll('button,[href],input,select,[tabindex]:not([tabindex="-1"])')).filter(function(el){return!el.disabled&&!el.getAttribute('aria-hidden')&&el.getClientRects().length})}
+
+/** Announce a line via live region only — never focus the large textarea. */
+function goToLine(index,opts){
+  opts=opts||{};
+  const lines=getLines();
+  const isEmpty=!lines.length;
+  if(isEmpty){
+    lineIndex=0;
+    updatePosition(0,0,true);
+    if(opts.speak!==false)announce('Buffer is empty.');
+    return -1;
+  }
+  lineIndex=Math.max(0,Math.min(lines.length-1,index));
+  updatePosition(lineIndex,lines.length,false);
+  if(opts.speak!==false){
+    announce('Line '+(lineIndex+1)+' of '+lines.length+': '+(lines[lineIndex]||'(empty line)'));
+  }
+  return lineIndex;
+}
+
+function openBuffer(){
+  lastFocused=document.activeElement;
+  mainView.setAttribute('inert','');
+  mainView.setAttribute('aria-hidden','true');
+  const text=capture();
+  bufferText.value=text||'(Buffer is empty.)';
+  buffer.hidden=false;
+  const lines=getLines();
+  lineIndex=0;
+  updatePosition(0,lines.length,!lines.length);
+  // Focus a small control — not the textarea — so screen readers do not say "too much to navigate"
+  const firstBtn=document.getElementById('buffer-first');
+  if(firstBtn)firstBtn.focus();
+  announce(lines.length?('Buffer opened. '+lines.length+' lines.'):'Buffer opened. Empty.');
+}
+
+function closeBuffer(){
+  buffer.hidden=true;
+  mainView.removeAttribute('inert');
+  mainView.removeAttribute('aria-hidden');
+  clearTimeout(autoRefreshTimer);
+  if(lastFocused&&document.contains(lastFocused)&&typeof lastFocused.focus==='function')lastFocused.focus();
+  else if(term)term.focus();
+  announce('Buffer closed.');
+}
+
+function refreshBuffer(opts){
+  opts=opts||{};
+  const prior=lineIndex;
+  const text=capture();
+  const rendered=text||'(Buffer is empty.)';
+  if(rendered===bufferText.value&&!opts.force){
+    if(!opts.silent)announce('No new output.');
+    return;
+  }
+  bufferText.value=rendered;
+  const lines=getLines();
+  lineIndex=lines.length?Math.min(prior,lines.length-1):0;
+  updatePosition(lineIndex,lines.length,!lines.length);
+  if(!opts.auto)announce('Buffer refreshed. '+bufferPosition.textContent);
+  else announce('Updated. '+bufferPosition.textContent);
+}
+
+function scheduleAutoRefresh(){
+  if(buffer.hidden)return;
+  clearTimeout(autoRefreshTimer);
+  autoRefreshTimer=setTimeout(function(){refreshBuffer({auto:true})},450);
+}
+
+function bufferFind(direction){
+  const query=bufferSearch.value.trim().toLowerCase();
+  if(!query){announce('Enter search text.');bufferSearch.focus();return}
+  const lines=getLines();
+  if(!lines.length){announce('Buffer is empty.');return}
+  const start=lineIndex;
+  for(let i=1;i<=lines.length;i++){
+    const idx=((start+direction*i)%lines.length+lines.length)%lines.length;
+    if(lines[idx].toLowerCase().includes(query)){
+      goToLine(idx);
+      return;
+    }
+  }
+  announce('No matches for '+query+'.',true);
+}
+
+function connect(){
+  const protocol=location.protocol==='https:'?'wss://':'ws://';
+  socket=new WebSocket(protocol+location.host+'/ws');
+  socket.addEventListener('open',function(){
+    status.textContent='Connected to PowerShell PTY.';
+    let cwd='';
+    try{cwd=localStorage.getItem('terminal-last-path')||''}catch(e){}
+    socket.send(JSON.stringify({type:'cwd',cwd:cwd,mode:'full'}));
+    announce('Full Console connected.');
+    if(term)term.focus();
+  });
+  socket.addEventListener('message',function(e){
+    const text=typeof e.data==='string'?e.data:String(e.data);
+    if(text.startsWith('{')){
+      try{
+        const msg=JSON.parse(text);
+        if(msg.type==='history'&&typeof msg.data==='string'){term.write(msg.data);return}
+      }catch(err){}
+    }
+    term.write(text);
+    if(!buffer.hidden)scheduleAutoRefresh();
+  });
+  socket.addEventListener('close',function(){status.textContent='Terminal connection closed.';announce('Connection closed.',true)});
+  socket.addEventListener('error',function(){status.textContent='Could not connect to the terminal.';announce('Could not connect.',true)});
+}
+
+function send(data){
+  if(socket&&socket.readyState===WebSocket.OPEN){socket.send(data);return true}
+  announce('Not connected.',true);
+  return false;
+}
+
+function init(){
+  if(typeof Terminal==='undefined'){
+    status.textContent='xterm.js could not be loaded.';
+    announce('xterm.js could not be loaded.',true);
+    return;
+  }
+  let screenReaderMode=false;
+  try{screenReaderMode=localStorage.getItem('terminal-sr-mode')==='true'}catch(e){}
+  term=new Terminal({
+    cursorBlink:true,convertEol:true,scrollback:5000,
+    fontFamily:'Consolas, "Courier New", monospace',fontSize:14,
+    screenReaderMode:screenReaderMode,
+    theme:{background:'#000000',foreground:'#e6e6e6',cursor:'#e6e6e6'}
+  });
+  const FitCtor=window.FitAddon&&(window.FitAddon.FitAddon||window.FitAddon);
+  if(FitCtor){fit=new FitCtor();term.loadAddon(fit)}
+  term.open(document.getElementById('terminal'));
+  if(fit){try{fit.fit()}catch(e){}}
+  term.onData(function(data){send(data)});
+  window.addEventListener('resize',function(){if(fit){try{fit.fit()}catch(e){}}});
+  connect();
+}
+
+document.getElementById('open-buffer').onclick=openBuffer;
+document.getElementById('buffer-refresh').onclick=function(){refreshBuffer({force:true})};
+document.getElementById('buffer-close').onclick=closeBuffer;
+document.getElementById('send-enter').onclick=function(){send('\r');if(term)term.focus();announce('Enter sent.')};
+document.getElementById('send-ctrl-c').onclick=function(){send('\x03');if(term)term.focus();announce('Ctrl+C sent.')};
+document.getElementById('clear').onclick=function(){if(term)term.clear();announce('Screen cleared.')};
+document.getElementById('accessible-mode').onclick=function(){try{localStorage.setItem('console-mode','accessible')}catch(e){}location.href='interactive_console.html'};
+document.getElementById('buffer-first').onclick=function(){goToLine(0)};
+document.getElementById('buffer-prev').onclick=function(){goToLine(lineIndex-1)};
+document.getElementById('buffer-next').onclick=function(){goToLine(lineIndex+1)};
+document.getElementById('buffer-last').onclick=function(){goToLine(getLines().length-1)};
+document.getElementById('buffer-find-next').onclick=function(){bufferFind(1)};
+document.getElementById('buffer-find-prev').onclick=function(){bufferFind(-1)};
+bufferSearch.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();bufferFind(1)}});
+
+buffer.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){e.preventDefault();closeBuffer();return}
+  // Arrow keys on buffer dialog also move lines without touching the textarea
+  if(e.key==='ArrowDown'||e.key==='ArrowRight'){e.preventDefault();goToLine(lineIndex+1);return}
+  if(e.key==='ArrowUp'||e.key==='ArrowLeft'){e.preventDefault();goToLine(lineIndex-1);return}
+  if(e.key==='Home'){e.preventDefault();goToLine(0);return}
+  if(e.key==='End'){e.preventDefault();goToLine(getLines().length-1);return}
+  if(e.key==='Tab'){
+    const f=getFocusable(buffer);
+    if(!f.length)return;
+    const first=f[0],last=f[f.length-1];
+    if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}
+    else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+  }
+});
+
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'&&isMenuOpen()){e.preventDefault();setMenuOpen(false);return}
+  if(!buffer.hidden)return;
+  if(!e.altKey||e.ctrlKey||e.metaKey)return;
+  if(e.key==='F2'||e.code==='F2'||e.key.toLowerCase()==='b'){
+    e.preventDefault();
+    openBuffer();
+    return;
+  }
+  const key=e.key.toLowerCase();
+  if(key==='t'){e.preventDefault();if(term){term.focus();announce('Terminal focused.')}}
+  else if(key==='m'){e.preventDefault();if(isMenuOpen())setMenuOpen(false);else setMenuOpen(true,0)}
+  else if(key==='enter'){e.preventDefault();send('\r');if(term)term.focus();announce('Enter sent.')}
+  else if(key==='i'){e.preventDefault();send('\x03');if(term)term.focus();announce('Ctrl+C sent.')}
+});
+
+init();
 })();
 </script>
 </body>
