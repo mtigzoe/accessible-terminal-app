@@ -1,0 +1,4 @@
+[     662ms] [LOG] send: "{\"type\":\"cwd\",\"cwd\":\"C:\\\\Users\\\\Miriam\",\"mode\":\"accessible\"}" @ http://localhost:3000/interactive_console.html:136
+[    1172ms] [LOG] OSC 633 P marker: C:\Users\Miriam @ http://localhost:3000/interactive_console.html:184
+[   46495ms] [LOG] send: "\r" @ http://localhost:3000/interactive_console.html:136
+[   46504ms] [LOG] OSC 633 P marker: C:\Users\Miriam @ http://localhost:3000/interactive_console.html:184

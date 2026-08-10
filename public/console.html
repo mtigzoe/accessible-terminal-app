@@ -104,7 +104,7 @@ kbd{font-family:Consolas,"Courier New",monospace;background:#222;border:1px soli
 const status=document.getElementById('status'),sr=document.getElementById('sr-status'),alertBox=document.getElementById('sr-alert'),mainView=document.getElementById('main-view'),buffer=document.getElementById('accessible-buffer'),bufferPosition=document.getElementById('buffer-position'),bufferLineDisplay=document.getElementById('buffer-line-display'),bufferContext=document.getElementById('buffer-context'),bufferContextNext=document.getElementById('buffer-context-next'),bufferSearch=document.getElementById('buffer-search'),menuToggle=document.getElementById('menu-toggle'),menuPanel=document.getElementById('menu-panel'),menuItems=Array.from(menuPanel.querySelectorAll('[role="menuitem"]')),terminalHost=document.getElementById('terminal');
 let socket=null,term=null,fit=null,autoRefreshTimer=null,lastFocused=null,lineIndex=0,bufferLines=[],bufferFingerprint='';
 // Live terminal speech: complete PTY lines + local key feedback (xterm SR mode stays off)
-let outputPending='',outputFlushTimer=null,typedDraft='',lastSentCommand='',suppressOutputSpeech=false;
+let outputPending='',outputFlushTimer=null,typedDraft='',lastSentCommand='',lastSentCommandTimeout=null,suppressOutputSpeech=false;
 
 function createAnnouncer(el){const queue=[];let active=false;const GAP_MS=280;function playNext(){if(queue.length===0){active=false;return}active=true;const text=queue.shift();el.textContent='';window.setTimeout(function(){el.textContent=text;window.setTimeout(playNext,GAP_MS)},40)}return function(text){if(!text)return;queue.push(String(text));while(queue.length>8)queue.shift();if(!active)playNext()}}
 const announcePolite=createAnnouncer(sr),announceAssertive=createAnnouncer(alertBox);
@@ -138,8 +138,17 @@ function flushOutputAnnounce(){
     const line=normalizeSpeechLine(parts[i]);
     if(!line)continue;
     // Skip PTY echo of the command we already announced as "Sent: …"
-    if(lastSentCommand&&(line===lastSentCommand||line.endsWith(lastSentCommand))){
+    let suppressed=false;
+    if(lastSentCommand){
+      if(line===lastSentCommand||line.endsWith(lastSentCommand)) suppressed=true;
+      else {
+        const idx=line.lastIndexOf(lastSentCommand);
+        if(idx>=0&&idx+lastSentCommand.length===line.length) suppressed=true;
+      }
+    }
+    if(suppressed){
       lastSentCommand='';
+      if(lastSentCommandTimeout){clearTimeout(lastSentCommandTimeout);lastSentCommandTimeout=null}
       continue;
     }
     lines.push(line);
@@ -180,6 +189,18 @@ function scheduleOutputAnnounce(raw){
 }
 
 function handleLocalInput(data){
+  // Announce escape sequences (arrow keys, home, end, etc.)
+  if(data.length>1&&data.charCodeAt(0)===27){
+    const seq=data.slice(1);
+    const escMap={
+      'A':'up arrow','B':'down arrow','C':'right arrow','D':'left arrow',
+      'H':'home','F':'end','5~':'page up','6~':'page down','3~':'delete','2~':'insert'
+    };
+    if(escMap[seq]){announce(escMap[seq]);return}
+    // Unrecognized escape sequence - ignore for speech
+    return;
+  }
+  
   // Speak keys as they are typed so the terminal is not a silent text field.
   // Full command is confirmed again on Enter; PTY line echo of that command is skipped.
   for(let i=0;i<data.length;i++){
@@ -190,6 +211,11 @@ function handleLocalInput(data){
       if(cmd){
         lastSentCommand=cmd;
         announce('Sent: '+cmd);
+        if(lastSentCommandTimeout)clearTimeout(lastSentCommandTimeout);
+        lastSentCommandTimeout=setTimeout(function(){
+          lastSentCommand='';
+          lastSentCommandTimeout=null;
+        }, 3000);
       }else{
         lastSentCommand='';
         announce('Enter');
@@ -203,7 +229,20 @@ function handleLocalInput(data){
     }else if(code===3){
       typedDraft='';
       lastSentCommand='';
+      if(lastSentCommandTimeout){clearTimeout(lastSentCommandTimeout);lastSentCommandTimeout=null}
       announce('Ctrl+C');
+    }else if(code===1){
+      announce('Control A');
+    }else if(code===5){
+      announce('Control E');
+    }else if(code===11){
+      announce('Control K');
+    }else if(code===21){
+      announce('Control U');
+    }else if(code===23){
+      announce('Control W');
+    }else if(code===12){
+      announce('Control L');
     }else if(code>=32){
       typedDraft+=ch;
       announce(ch===' '?'space':ch);
@@ -421,7 +460,7 @@ function connect(){
     if(term)term.focus();
   });
   socket.addEventListener('message',function(e){
-    const text=typeof e.data==='string'?e.data:String(e.data);
+    let text=typeof e.data==='string'?e.data:String(e.data);
     if(text.startsWith('{')){
       try{
         const msg=JSON.parse(text);
@@ -432,6 +471,21 @@ function connect(){
         }
       }catch(err){}
     }
+    
+    // Parse OSC 633 markers for path tracking (mirrors app-shell.js processOscMarkers)
+    const oscRe=/\u001b\]633;([^\u0007]*)\u0007/g;
+    let oscMatch;
+    while((oscMatch=oscRe.exec(text))!==null){
+      const parts=oscMatch[1].split(';');
+      if(parts[0]==='P'){
+        const prop=parts.slice(1).join(';');
+        const cwdMatch=prop.match(/^Cwd=(.*)$/);
+        if(cwdMatch){
+          try{localStorage.setItem('terminal-last-path',cwdMatch[1])}catch(e){}
+        }
+      }
+    }
+    
     term.write(text);
     scheduleOutputAnnounce(text);
     if(!buffer.hidden)scheduleAutoRefresh();
@@ -441,7 +495,23 @@ function connect(){
 }
 
 function send(data){
-  if(socket&&socket.readyState===WebSocket.OPEN){socket.send(data);return true}
+  if(socket&&socket.readyState===WebSocket.OPEN){
+    if(data==='\r'&&!lastSentCommand&&typedDraft){
+      lastSentCommand=normalizeSpeechLine(typedDraft);
+      typedDraft='';
+      if(lastSentCommandTimeout)clearTimeout(lastSentCommandTimeout);
+      lastSentCommandTimeout=setTimeout(function(){
+        lastSentCommand='';
+        lastSentCommandTimeout=null;
+      }, 3000);
+    }else if(data==='\x03'){
+      lastSentCommand='';
+      typedDraft='';
+      if(lastSentCommandTimeout){clearTimeout(lastSentCommandTimeout);lastSentCommandTimeout=null}
+    }
+    socket.send(data);
+    return true;
+  }
   announce('Not connected.',true);
   return false;
 }

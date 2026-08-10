@@ -1,0 +1,30 @@
+- generic [ref=e1]:
+  - link "Skip to terminal" [ref=e2] [cursor=pointer]:
+    - /url: "#terminal"
+  - link "Skip to accessible buffer button" [ref=e3] [cursor=pointer]:
+    - /url: "#open-buffer"
+  - generic [ref=e4]:
+    - navigation "Main menu" [ref=e5]:
+      - button "Menu" [ref=e6] [cursor=pointer]
+    - toolbar "Full console actions" [ref=e7]:
+      - button "Open accessible buffer" [ref=e8] [cursor=pointer]
+      - button "Send Enter" [ref=e9] [cursor=pointer]
+      - button "Send Ctrl+C" [ref=e10] [cursor=pointer]
+      - button "Clear screen" [ref=e11] [cursor=pointer]
+      - button "Switch to Interactive Console" [ref=e12] [cursor=pointer]
+      - status [ref=e13]: Connected to PowerShell PTY.
+    - paragraph [ref=e14]: "Shortcuts: Alt+F2 or Alt+B accessible buffer, Alt+T terminal, Alt+M menu, Alt+Enter Enter, Alt+I Ctrl+C, Escape close buffer."
+    - application "Terminal. Type commands here. Press Alt+B or Alt+F2 to open the accessible buffer. Output is announced as it arrives." [ref=e15]:
+      - generic [ref=e18]:
+        - textbox "Terminal input" [active] [ref=e53]
+        - generic [ref=e19]:
+          - generic [ref=e20]: PS C:\Users\Miriam> cd personal_coding_projects
+          - generic [ref=e22]: "Set-Location: Cannot find path 'C:\\Users\\Miriam\\personal_coding_projects' because it does not exist."
+          - generic [ref=e23]: PS C:\Users\Miriam> mkdir personal_coding_projects
+          - generic [ref=e25]: "Directory: C:\\Users\\Miriam"
+          - generic [ref=e28]: Mode LastWriteTime Length Name
+          - generic [ref=e29]: "---- ------------- ------ ----"
+          - generic [ref=e30]: d---- 8/10/2026 1:39 PM personal_coding_projects
+          - generic [ref=e32]: PS C:\Users\Miriam>
+  - status [ref=e51]: "Set-Location: Cannot find path 'C:\\Users\\Miriam\\personal_coding_projects' because it does not exist."
+  - alert [ref=e52]

@@ -1,0 +1,10 @@
+[     739ms] [LOG] WS message: "\u001b[?9001h\u001b[?1004h" @ http://localhost:3000/console.html:463
+[    1157ms] [LOG] WS message: "\u001b[?25l\u001b[2J\u001b[m\u001b[H\u001b]0;C:\\Program Files\\PowerShell\\7\\pwsh.exe\u0007\u001b[?25h\u001b]633;D;0\u0007\u001b]633;A\u0007\u001b]633;P;Cwd=C:\\Users\\Miriam\u0007" @ http://localhost:3000/console.html:463
+[    1158ms] [LOG] OSC 633 P marker: C:\Users\Miriam @ http://localhost:3000/console.html:484
+[    1168ms] [LOG] WS message: "PS C:\\Users\\Miriam> " @ http://localhost:3000/console.html:463
+[   33570ms] [LOG] WS message: "\u001b[?25l" @ http://localhost:3000/console.html:463
+[   33593ms] [LOG] WS message: "cd personal_coding_projects\u001b[?25h" @ http://localhost:3000/console.html:463
+[   44697ms] [LOG] WS message: "\r\n" @ http://localhost:3000/console.html:463
+[   44712ms] [LOG] WS message: "\u001b]633;D;0\u0007\u001b]633;A\u0007\u001b]633;P;Cwd=C:\\Users\\Miriam\\personal_coding_projects\u0007" @ http://localhost:3000/console.html:463
+[   44712ms] [LOG] OSC 633 P marker: C:\Users\Miriam\personal_coding_projects @ http://localhost:3000/console.html:484
+[   44723ms] [LOG] WS message: "PS C:\\Users\\Miriam\\personal_coding_projects> " @ http://localhost:3000/console.html:463

@@ -1,0 +1,22 @@
+- generic [active] [ref=e1]:
+  - link "Skip to terminal" [ref=e2] [cursor=pointer]:
+    - /url: "#terminal"
+  - link "Skip to accessible buffer button" [ref=e3] [cursor=pointer]:
+    - /url: "#open-buffer"
+  - generic [ref=e4]:
+    - navigation "Main menu" [ref=e5]:
+      - button "Menu" [ref=e6] [cursor=pointer]
+    - toolbar "Full console actions" [ref=e7]:
+      - button "Open accessible buffer" [ref=e8] [cursor=pointer]
+      - button "Send Enter" [ref=e9] [cursor=pointer]
+      - button "Send Ctrl+C" [ref=e10] [cursor=pointer]
+      - button "Clear screen" [ref=e11] [cursor=pointer]
+      - button "Switch to Interactive Console" [ref=e12] [cursor=pointer]
+      - status [ref=e13]: Connecting…
+    - paragraph [ref=e14]: "Shortcuts: Alt+F2 or Alt+B accessible buffer, Alt+T terminal, Alt+M menu, Alt+Enter Enter, Alt+I Ctrl+C, Escape close buffer."
+    - application "Terminal. Type commands here. Press Alt+B or Alt+F2 to open the accessible buffer. Output is announced as it arrives." [ref=e15]:
+      - generic [ref=e18]:
+        - generic:
+          - textbox "Terminal input"
+  - status [ref=e52]
+  - alert [ref=e53]
