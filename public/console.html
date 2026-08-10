@@ -103,6 +103,9 @@ kbd{font-family:Consolas,"Courier New",monospace;background:#222;border:1px soli
 'use strict';
 const status=document.getElementById('status'),sr=document.getElementById('sr-status'),alertBox=document.getElementById('sr-alert'),mainView=document.getElementById('main-view'),buffer=document.getElementById('accessible-buffer'),bufferPosition=document.getElementById('buffer-position'),bufferLineDisplay=document.getElementById('buffer-line-display'),bufferContext=document.getElementById('buffer-context'),bufferContextNext=document.getElementById('buffer-context-next'),bufferSearch=document.getElementById('buffer-search'),menuToggle=document.getElementById('menu-toggle'),menuPanel=document.getElementById('menu-panel'),menuItems=Array.from(menuPanel.querySelectorAll('[role="menuitem"]')),terminalHost=document.getElementById('terminal');
 let socket=null,term=null,fit=null,autoRefreshTimer=null,lastFocused=null,lineIndex=0,bufferLines=[],bufferFingerprint='';
+// Parallel clean-text history for the accessible buffer (independent of xterm cell buffer).
+// This guarantees the buffer has readable output even if xterm buffer scraping is empty or delayed.
+let outputHistory=[],outputHistoryPending='';
 // Live terminal speech: complete PTY lines + local key feedback (xterm SR mode stays off)
 let outputPending='',outputFlushTimer=null,typedDraft='',lastSentCommand='',lastSentCommandTimeout=null,suppressOutputSpeech=false;
 
@@ -122,6 +125,23 @@ function stripAnsi(str){
 
 function normalizeSpeechLine(text){
   return String(text).replace(/\s+/g,' ').trim();
+}
+
+/** Append cleaned PTY text to the parallel history used by the accessible buffer. */
+function appendToOutputHistory(raw){
+  if(!raw)return;
+  const clean=stripAnsi(raw);
+  if(!clean)return;
+  outputHistoryPending+=clean;
+  const parts=outputHistoryPending.split('\n');
+  outputHistoryPending=parts.pop()||'';
+  for(let i=0;i<parts.length;i++){
+    const line=normalizeSpeechLine(parts[i]);
+    if(line)outputHistory.push(line);
+  }
+  // Cap history so the accessible buffer stays usable
+  const MAX=2000;
+  if(outputHistory.length>MAX)outputHistory=outputHistory.slice(outputHistory.length-MAX);
 }
 
 function flushOutputAnnounce(){
@@ -406,7 +426,14 @@ function goToLine(index,opts){
 }
 
 function loadBufferFromTerminal(){
-  bufferLines=captureLines();
+  // Prefer the parallel clean-text history (reliable for accessibility).
+  // Fall back to scraping xterm's cell buffer only when history is empty
+  // (e.g. very early after connect before any data arrived).
+  if(outputHistory.length){
+    bufferLines=outputHistory.slice();
+  }else{
+    bufferLines=captureLines();
+  }
   bufferFingerprint=fingerprintLines(bufferLines);
   return bufferLines;
 }
@@ -416,6 +443,12 @@ function openBuffer(){
   suppressOutputSpeech=true;
   if(outputFlushTimer){clearTimeout(outputFlushTimer);outputFlushTimer=null}
   outputPending='';
+  // Flush any partial line still held for the parallel history so the buffer is complete.
+  if(outputHistoryPending){
+    const pending=normalizeSpeechLine(outputHistoryPending);
+    if(pending)outputHistory.push(pending);
+    outputHistoryPending='';
+  }
   mainView.setAttribute('inert','');
   mainView.setAttribute('aria-hidden','true');
   const lines=loadBufferFromTerminal();
@@ -460,7 +493,8 @@ function closeBuffer(){
 function refreshBuffer(opts){
   opts=opts||{};
   const prior=lineIndex;
-  const lines=captureLines();
+  // Prefer parallel history; fall back to xterm scrape only when history is empty.
+  const lines=outputHistory.length?outputHistory.slice():captureLines();
   const fp=fingerprintLines(lines);
   if(fp===bufferFingerprint&&!opts.force){
     if(!opts.silent)announce('No new output.');
@@ -519,7 +553,9 @@ function connect(){
         const msg=JSON.parse(text);
         if(msg.type==='history'&&typeof msg.data==='string'){
           term.write(msg.data);
-          // History replay: do not flood the SR; user can open the buffer
+          // Feed the parallel history so the accessible buffer has content after reconnect/replay.
+          // Do not flood live-region speech for history.
+          appendToOutputHistory(msg.data);
           return;
         }
       }catch(err){}
@@ -540,6 +576,7 @@ function connect(){
     }
     
     term.write(text);
+    appendToOutputHistory(text);
     scheduleOutputAnnounce(text);
     if(!buffer.hidden)scheduleAutoRefresh();
   });
@@ -619,7 +656,14 @@ document.getElementById('buffer-refresh').onclick=function(){refreshBuffer({forc
 document.getElementById('buffer-close').onclick=closeBuffer;
 document.getElementById('send-enter').onclick=function(){send('\r');if(term)term.focus();announce('Enter sent.')};
 document.getElementById('send-ctrl-c').onclick=function(){send('\x03');if(term)term.focus();announce('Ctrl+C sent.')};
-document.getElementById('clear').onclick=function(){if(term)term.clear();announce('Screen cleared.')};
+document.getElementById('clear').onclick=function(){
+  if(term)term.clear();
+  outputHistory=[];
+  outputHistoryPending='';
+  bufferLines=[];
+  bufferFingerprint='';
+  announce('Screen cleared.');
+};
 document.getElementById('accessible-mode').onclick=function(){try{localStorage.setItem('console-mode','accessible')}catch(e){}location.href='interactive_console.html'};
 document.getElementById('buffer-first').onclick=function(){goToLine(0)};
 document.getElementById('buffer-prev').onclick=function(){goToLine(lineIndex-1)};
