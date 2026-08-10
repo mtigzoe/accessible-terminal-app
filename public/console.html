@@ -30,7 +30,11 @@ body{margin:0;padding:12px;padding-top:56px;background:var(--panel);color:var(--
 #accessible-buffer .panel{height:100%;display:flex;flex-direction:column;background:var(--bg);border:1px solid var(--border);padding:14px;border-radius:6px}
 #buffer-help{color:var(--muted);margin:0 0 8px}
 #buffer-position{color:var(--muted);margin:0 0 10px;font-size:.95rem}
-#buffer-text{flex:1;width:100%;resize:none;background:#000;color:var(--text);border:1px solid var(--border);padding:10px;font:16px/1.4 Consolas,"Courier New",monospace}
+/* Visual only: never put the full buffer into a focusable/accessible text control. */
+#buffer-view{flex:1;display:flex;flex-direction:column;justify-content:center;min-height:8rem;background:#000;color:var(--text);border:1px solid var(--border);padding:14px;font:16px/1.5 Consolas,"Courier New",monospace;overflow:hidden}
+#buffer-context{color:#777;min-height:1.5em;white-space:pre-wrap;word-break:break-word}
+#buffer-line-display{color:var(--text);min-height:1.5em;white-space:pre-wrap;word-break:break-word;border-left:3px solid var(--accent);padding-left:10px;margin:6px 0}
+#buffer-context-next{color:#777;min-height:1.5em;white-space:pre-wrap;word-break:break-word}
 #accessible-buffer .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
 #accessible-buffer .row label{color:var(--muted)}
 #buffer-search{background:#000;color:var(--text);border:1px solid var(--border);padding:8px;flex:1;min-width:10rem;font:inherit}
@@ -63,14 +67,19 @@ kbd{font-family:Consolas,"Courier New",monospace;background:#222;border:1px soli
 <span id="status" class="status" role="status" aria-live="polite" aria-atomic="true">Connecting…</span>
 </div>
 <p class="shortcuts-help" id="shortcuts-help">Shortcuts: <kbd>Alt+F2</kbd> or <kbd>Alt+B</kbd> accessible buffer, <kbd>Alt+T</kbd> terminal, <kbd>Alt+M</kbd> menu, <kbd>Alt+Enter</kbd> Enter, <kbd>Alt+I</kbd> Ctrl+C, <kbd>Escape</kbd> close buffer.</p>
-<div id="terminal" aria-label="Terminal"></div>
+<div id="terminal" role="application" aria-label="Terminal. Type commands here. Press Alt+B or Alt+F2 to open the accessible buffer. Output is announced as it arrives." tabindex="0"></div>
 </div>
-<div id="accessible-buffer" hidden role="dialog" aria-modal="true" aria-labelledby="buffer-heading">
+<div id="accessible-buffer" hidden role="dialog" aria-modal="true" aria-labelledby="buffer-heading" aria-describedby="buffer-help">
 <div class="panel">
 <h1 id="buffer-heading">Accessible terminal buffer</h1>
-<p id="buffer-help">Use First, Previous, Next, and Last to hear each line. Escape closes.</p>
-<p id="buffer-position" role="status" aria-live="polite" aria-atomic="true">Buffer is empty.</p>
-<textarea id="buffer-text" tabindex="-1" aria-hidden="true" spellcheck="false" readonly></textarea>
+<p id="buffer-help">Use First, Previous, Next, and Last (or arrow keys) to hear one line at a time. Escape closes. The full buffer is never placed in a single text field.</p>
+<p id="buffer-position" aria-hidden="true">Buffer is empty.</p>
+<!-- Visual preview only; full lines live in JS. aria-hidden so SRs never face a huge region. -->
+<div id="buffer-view" aria-hidden="true">
+  <div id="buffer-context"></div>
+  <div id="buffer-line-display">(no line selected)</div>
+  <div id="buffer-context-next"></div>
+</div>
 <div class="toolbar" role="group" aria-label="Buffer navigation">
 <button id="buffer-first" type="button">First line</button>
 <button id="buffer-prev" type="button">Previous line</button>
@@ -92,12 +101,160 @@ kbd{font-family:Consolas,"Courier New",monospace;background:#222;border:1px soli
 <script>
 (function(){
 'use strict';
-const status=document.getElementById('status'),sr=document.getElementById('sr-status'),alertBox=document.getElementById('sr-alert'),mainView=document.getElementById('main-view'),buffer=document.getElementById('accessible-buffer'),bufferText=document.getElementById('buffer-text'),bufferPosition=document.getElementById('buffer-position'),bufferSearch=document.getElementById('buffer-search'),menuToggle=document.getElementById('menu-toggle'),menuPanel=document.getElementById('menu-panel'),menuItems=Array.from(menuPanel.querySelectorAll('[role="menuitem"]'));
-let socket=null,term=null,fit=null,autoRefreshTimer=null,lastFocused=null,lineIndex=0;
+const status=document.getElementById('status'),sr=document.getElementById('sr-status'),alertBox=document.getElementById('sr-alert'),mainView=document.getElementById('main-view'),buffer=document.getElementById('accessible-buffer'),bufferPosition=document.getElementById('buffer-position'),bufferLineDisplay=document.getElementById('buffer-line-display'),bufferContext=document.getElementById('buffer-context'),bufferContextNext=document.getElementById('buffer-context-next'),bufferSearch=document.getElementById('buffer-search'),menuToggle=document.getElementById('menu-toggle'),menuPanel=document.getElementById('menu-panel'),menuItems=Array.from(menuPanel.querySelectorAll('[role="menuitem"]')),terminalHost=document.getElementById('terminal');
+let socket=null,term=null,fit=null,autoRefreshTimer=null,lastFocused=null,lineIndex=0,bufferLines=[],bufferFingerprint='';
+// Live terminal speech: complete PTY lines + local key feedback (xterm SR mode stays off)
+let outputPending='',outputFlushTimer=null,typedDraft='',lastSentCommand='',suppressOutputSpeech=false;
 
-function createAnnouncer(el){const queue=[];let active=false;const GAP_MS=280;function playNext(){if(queue.length===0){active=false;return}active=true;const text=queue.shift();el.textContent='';window.setTimeout(function(){el.textContent=text;window.setTimeout(playNext,GAP_MS)},40)}return function(text){if(!text)return;queue.push(String(text));while(queue.length>6)queue.shift();if(!active)playNext()}}
+function createAnnouncer(el){const queue=[];let active=false;const GAP_MS=280;function playNext(){if(queue.length===0){active=false;return}active=true;const text=queue.shift();el.textContent='';window.setTimeout(function(){el.textContent=text;window.setTimeout(playNext,GAP_MS)},40)}return function(text){if(!text)return;queue.push(String(text));while(queue.length>8)queue.shift();if(!active)playNext()}}
 const announcePolite=createAnnouncer(sr),announceAssertive=createAnnouncer(alertBox);
 function announce(text,urgent){if(urgent)announceAssertive(text);else announcePolite(text)}
+
+/** Strip CSI/OSC/other ESC sequences so live regions get readable text only. */
+function stripAnsi(str){
+  return String(str)
+    .replace(/\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)/g,'')
+    .replace(/\u001b\[[0-9;?]*[ -/]*[@-~]/g,'')
+    .replace(/\u001b[P^_].*?(?:\u001b\\|\u0007)/g,'')
+    .replace(/\u001b./g,'')
+    .replace(/\r/g,'');
+}
+
+function normalizeSpeechLine(text){
+  return String(text).replace(/\s+/g,' ').trim();
+}
+
+function flushOutputAnnounce(){
+  outputFlushTimer=null;
+  // Accessible buffer owns speech while open
+  if(!buffer.hidden){outputPending='';return}
+  const chunk=outputPending;
+  outputPending='';
+  if(!chunk)return;
+  const parts=chunk.split('\n');
+  const partial=parts.pop();
+  const lines=[];
+  for(let i=0;i<parts.length;i++){
+    const line=normalizeSpeechLine(parts[i]);
+    if(!line)continue;
+    // Skip PTY echo of the command we already announced as "Sent: …"
+    if(lastSentCommand&&(line===lastSentCommand||line.endsWith(lastSentCommand))){
+      lastSentCommand='';
+      continue;
+    }
+    lines.push(line);
+  }
+  // Only speak partials when they are long (progress / spinners without newline)
+  if(partial&&partial.length>160){
+    const sample=normalizeSpeechLine(partial);
+    if(sample)lines.push(sample);
+  }else if(partial){
+    outputPending=partial;
+  }
+  if(!lines.length)return;
+  const max=4;
+  if(lines.length>max){
+    const extra=lines.length-max;
+    const speak=lines.slice(-max); // newest lines matter most
+    speak[0]='… '+extra+' earlier lines omitted. '+speak[0];
+    speak.push('Press Alt+B for the accessible buffer.');
+    for(let i=0;i<speak.length;i++)announce(speak[i]);
+  }else{
+    for(let i=0;i<lines.length;i++)announce(lines[i]);
+  }
+}
+
+function scheduleOutputAnnounce(raw){
+  if(suppressOutputSpeech||!buffer.hidden)return;
+  const clean=stripAnsi(raw);
+  if(!clean)return;
+  outputPending+=clean;
+  if(outputFlushTimer)clearTimeout(outputFlushTimer);
+  // Announce on newline (command results / prompts). Do not speak short partials
+  // (character echo) — local key handler already speaks typed characters.
+  if(clean.indexOf('\n')!==-1){
+    outputFlushTimer=setTimeout(flushOutputAnnounce,50);
+  }else if(outputPending.length>160){
+    outputFlushTimer=setTimeout(flushOutputAnnounce,80);
+  }
+}
+
+function handleLocalInput(data){
+  // Speak keys as they are typed so the terminal is not a silent text field.
+  // Full command is confirmed again on Enter; PTY line echo of that command is skipped.
+  for(let i=0;i<data.length;i++){
+    const ch=data.charAt(i);
+    const code=data.charCodeAt(i);
+    if(ch==='\r'||ch==='\n'){
+      const cmd=normalizeSpeechLine(typedDraft);
+      if(cmd){
+        lastSentCommand=cmd;
+        announce('Sent: '+cmd);
+      }else{
+        lastSentCommand='';
+        announce('Enter');
+      }
+      typedDraft='';
+    }else if(code===127||code===8){
+      if(typedDraft.length){
+        typedDraft=typedDraft.slice(0,-1);
+        announce('backspace');
+      }
+    }else if(code===3){
+      typedDraft='';
+      lastSentCommand='';
+      announce('Ctrl+C');
+    }else if(code>=32){
+      typedDraft+=ch;
+      announce(ch===' '?'space':ch);
+    }
+  }
+}
+
+/** Shared shortcut handler. Returns true if the event was handled. */
+function handleAppShortcut(e){
+  if(!e.altKey||e.ctrlKey||e.metaKey)return false;
+  if(!buffer.hidden)return false;
+  const key=e.key;
+  const code=e.code;
+  const lower=typeof key==='string'?key.toLowerCase():'';
+  if(key==='F2'||code==='F2'||lower==='b'){
+    e.preventDefault();
+    e.stopPropagation();
+    openBuffer();
+    return true;
+  }
+  if(lower==='t'){
+    e.preventDefault();
+    e.stopPropagation();
+    if(term){term.focus();announce('Terminal focused.')}
+    return true;
+  }
+  if(lower==='m'){
+    e.preventDefault();
+    e.stopPropagation();
+    if(isMenuOpen())setMenuOpen(false);else setMenuOpen(true,0);
+    return true;
+  }
+  if(lower==='enter'||key==='Enter'){
+    e.preventDefault();
+    e.stopPropagation();
+    send('\r');
+    if(term)term.focus();
+    announce('Enter sent.');
+    return true;
+  }
+  if(lower==='i'){
+    e.preventDefault();
+    e.stopPropagation();
+    send('\x03');
+    typedDraft='';
+    if(term)term.focus();
+    announce('Ctrl+C sent.');
+    return true;
+  }
+  return false;
+}
 
 function isMenuOpen(){return menuToggle.getAttribute('aria-expanded')==='true'}
 function setMenuOpen(open,focusIndex){menuToggle.setAttribute('aria-expanded',open?'true':'false');menuPanel.dataset.open=open?'true':'false';if(open){menuPanel.hidden=false;const index=typeof focusIndex==='number'&&focusIndex>=0&&focusIndex<menuItems.length?focusIndex:0;menuItems[index].focus()}else{menuPanel.hidden=true;menuToggle.focus()}}
@@ -109,44 +266,85 @@ menuToggle.addEventListener('keydown',function(event){if(event.key==='ArrowDown'
 menuPanel.addEventListener('keydown',function(event){if(!isMenuOpen())return;const idx=currentMenuIndex();switch(event.key){case'ArrowDown':event.preventDefault();focusMenuItem(idx<0?0:idx+1);break;case'ArrowUp':event.preventDefault();focusMenuItem(idx<0?menuItems.length-1:idx-1);break;case'Home':event.preventDefault();focusMenuItem(0);break;case'End':event.preventDefault();focusMenuItem(menuItems.length-1);break;case'Escape':event.preventDefault();setMenuOpen(false);break;case'Tab':setMenuOpen(false);break;case'Enter':case' ':event.preventDefault();activateMenuItem(document.activeElement);break}});
 document.addEventListener('click',function(event){if(!menuToggle.contains(event.target)&&!menuPanel.contains(event.target)){if(isMenuOpen()){menuToggle.setAttribute('aria-expanded','false');menuPanel.dataset.open='false';menuPanel.hidden=true}}});
 
-function capture(){if(!term)return'';const b=term.buffer.active,lines=[];for(let i=0;i<b.length;i++){const line=b.getLine(i);lines.push(line?line.translateToString(true):'')}while(lines.length&&lines[lines.length-1]==='')lines.pop();return lines.join('\n')}
-function getLines(){const raw=bufferText.value;if(!raw||raw==='(Buffer is empty.)')return[];return raw.split('\n')}
-function updatePosition(index,total,isEmpty){bufferPosition.textContent=isEmpty?'Buffer is empty.':('Line '+(index+1)+' of '+total+'.')}
+/** Capture terminal buffer into a JS array only — never dump the full text into the DOM. */
+function captureLines(){
+  if(!term)return[];
+  const b=term.buffer.active,lines=[];
+  for(let i=0;i<b.length;i++){
+    const line=b.getLine(i);
+    lines.push(line?line.translateToString(true):'');
+  }
+  while(lines.length&&lines[lines.length-1]==='')lines.pop();
+  return lines;
+}
+function fingerprintLines(lines){
+  if(!lines.length)return'0:';
+  // Cheap change detector: length + first/last line samples (avoids joining multi-MB buffers)
+  return lines.length+':'+lines[0]+'\n'+lines[lines.length-1]+'\n'+(lines[Math.floor(lines.length/2)]||'');
+}
+function getLines(){return bufferLines}
+function displayLine(text){return text&&text.length?text:'(empty line)'}
+function updateLineView(index,total,isEmpty){
+  if(isEmpty){
+    bufferPosition.textContent='Buffer is empty.';
+    bufferLineDisplay.textContent='(Buffer is empty.)';
+    bufferContext.textContent='';
+    bufferContextNext.textContent='';
+    return;
+  }
+  bufferPosition.textContent='Line '+(index+1)+' of '+total+'.';
+  bufferLineDisplay.textContent=displayLine(bufferLines[index]);
+  bufferContext.textContent=index>0?displayLine(bufferLines[index-1]):'';
+  bufferContextNext.textContent=index<total-1?displayLine(bufferLines[index+1]):'';
+}
 function getFocusable(container){return Array.from(container.querySelectorAll('button,[href],input,select,[tabindex]:not([tabindex="-1"])')).filter(function(el){return!el.disabled&&!el.getAttribute('aria-hidden')&&el.getClientRects().length})}
 
-/** Announce a line via live region only — never focus the large textarea. */
+/** Announce one line via live region only. Never focus or expose a full-buffer text control. */
 function goToLine(index,opts){
   opts=opts||{};
   const lines=getLines();
   const isEmpty=!lines.length;
   if(isEmpty){
     lineIndex=0;
-    updatePosition(0,0,true);
+    updateLineView(0,0,true);
     if(opts.speak!==false)announce('Buffer is empty.');
     return -1;
   }
   lineIndex=Math.max(0,Math.min(lines.length-1,index));
-  updatePosition(lineIndex,lines.length,false);
+  updateLineView(lineIndex,lines.length,false);
   if(opts.speak!==false){
-    announce('Line '+(lineIndex+1)+' of '+lines.length+': '+(lines[lineIndex]||'(empty line)'));
+    announce('Line '+(lineIndex+1)+' of '+lines.length+': '+displayLine(lines[lineIndex]));
   }
   return lineIndex;
 }
 
+function loadBufferFromTerminal(){
+  bufferLines=captureLines();
+  bufferFingerprint=fingerprintLines(bufferLines);
+  return bufferLines;
+}
+
 function openBuffer(){
   lastFocused=document.activeElement;
+  // Pause live terminal speech; buffer navigation owns announcements
+  suppressOutputSpeech=true;
+  if(outputFlushTimer){clearTimeout(outputFlushTimer);outputFlushTimer=null}
+  outputPending='';
   mainView.setAttribute('inert','');
   mainView.setAttribute('aria-hidden','true');
-  const text=capture();
-  bufferText.value=text||'(Buffer is empty.)';
+  const lines=loadBufferFromTerminal();
   buffer.hidden=false;
-  const lines=getLines();
   lineIndex=0;
-  updatePosition(0,lines.length,!lines.length);
-  // Focus a small control — not the textarea — so screen readers do not say "too much to navigate"
+  updateLineView(0,lines.length,!lines.length);
+  // Focus a small control so the SR never lands on a large text region
   const firstBtn=document.getElementById('buffer-first');
   if(firstBtn)firstBtn.focus();
-  announce(lines.length?('Buffer opened. '+lines.length+' lines.'):'Buffer opened. Empty.');
+  if(!lines.length){
+    announce('Buffer opened. Empty.');
+  }else{
+    // Open summary only — do not dump all lines. User navigates line-by-line next.
+    announce('Buffer opened. '+lines.length+' lines. First line: '+displayLine(lines[0]));
+  }
 }
 
 function closeBuffer(){
@@ -154,32 +352,45 @@ function closeBuffer(){
   mainView.removeAttribute('inert');
   mainView.removeAttribute('aria-hidden');
   clearTimeout(autoRefreshTimer);
-  if(lastFocused&&document.contains(lastFocused)&&typeof lastFocused.focus==='function')lastFocused.focus();
-  else if(term)term.focus();
-  announce('Buffer closed.');
+  bufferLines=[];
+  bufferFingerprint='';
+  bufferLineDisplay.textContent='(no line selected)';
+  bufferContext.textContent='';
+  bufferContextNext.textContent='';
+  bufferPosition.textContent='Buffer is empty.';
+  suppressOutputSpeech=false;
+  if(lastFocused&&document.contains(lastFocused)&&typeof lastFocused.focus==='function'){
+    try{lastFocused.focus()}catch(err){if(term)term.focus()}
+  }else if(term)term.focus();
+  announce('Buffer closed. Terminal focused.');
 }
 
 function refreshBuffer(opts){
   opts=opts||{};
   const prior=lineIndex;
-  const text=capture();
-  const rendered=text||'(Buffer is empty.)';
-  if(rendered===bufferText.value&&!opts.force){
+  const lines=captureLines();
+  const fp=fingerprintLines(lines);
+  if(fp===bufferFingerprint&&!opts.force){
     if(!opts.silent)announce('No new output.');
     return;
   }
-  bufferText.value=rendered;
-  const lines=getLines();
+  bufferLines=lines;
+  bufferFingerprint=fp;
   lineIndex=lines.length?Math.min(prior,lines.length-1):0;
-  updatePosition(lineIndex,lines.length,!lines.length);
-  if(!opts.auto)announce('Buffer refreshed. '+bufferPosition.textContent);
-  else announce('Updated. '+bufferPosition.textContent);
+  updateLineView(lineIndex,lines.length,!lines.length);
+  if(!lines.length){
+    if(!opts.silent)announce(opts.auto?'Updated. Buffer is empty.':'Buffer refreshed. Buffer is empty.');
+    return;
+  }
+  const pos='Line '+(lineIndex+1)+' of '+lines.length;
+  if(opts.auto)announce('Updated. '+pos+'. '+displayLine(lines[lineIndex]));
+  else announce('Buffer refreshed. '+pos+'. '+displayLine(lines[lineIndex]));
 }
 
 function scheduleAutoRefresh(){
   if(buffer.hidden)return;
   clearTimeout(autoRefreshTimer);
-  autoRefreshTimer=setTimeout(function(){refreshBuffer({auto:true})},450);
+  autoRefreshTimer=setTimeout(function(){refreshBuffer({auto:true,silent:true})},450);
 }
 
 function bufferFind(direction){
@@ -214,10 +425,15 @@ function connect(){
     if(text.startsWith('{')){
       try{
         const msg=JSON.parse(text);
-        if(msg.type==='history'&&typeof msg.data==='string'){term.write(msg.data);return}
+        if(msg.type==='history'&&typeof msg.data==='string'){
+          term.write(msg.data);
+          // History replay: do not flood the SR; user can open the buffer
+          return;
+        }
       }catch(err){}
     }
     term.write(text);
+    scheduleOutputAnnounce(text);
     if(!buffer.hidden)scheduleAutoRefresh();
   });
   socket.addEventListener('close',function(){status.textContent='Terminal connection closed.';announce('Connection closed.',true)});
@@ -236,6 +452,8 @@ function init(){
     announce('xterm.js could not be loaded.',true);
     return;
   }
+  // Keep xterm's built-in SR layer off by default — we own announcements.
+  // Users may still enable it in Settings (experimental); our announcer still runs.
   let screenReaderMode=false;
   try{screenReaderMode=localStorage.getItem('terminal-sr-mode')==='true'}catch(e){}
   term=new Terminal({
@@ -246,11 +464,31 @@ function init(){
   });
   const FitCtor=window.FitAddon&&(window.FitAddon.FitAddon||window.FitAddon);
   if(FitCtor){fit=new FitCtor();term.loadAddon(fit)}
-  term.open(document.getElementById('terminal'));
+  term.open(terminalHost);
   if(fit){try{fit.fit()}catch(e){}}
-  term.onData(function(data){send(data)});
+
+  // xterm's textarea swallows keys before document bubble listeners see them.
+  // Intercept app shortcuts here and cancel xterm handling.
+  if(typeof term.attachCustomKeyEventHandler==='function'){
+    term.attachCustomKeyEventHandler(function(ev){
+      if(ev.type!=='keydown')return true;
+      if(handleAppShortcut(ev))return false;
+      return true;
+    });
+  }
+
+  term.onData(function(data){
+    handleLocalInput(data);
+    send(data);
+  });
+
+  // Clicking the terminal host focuses xterm
+  terminalHost.addEventListener('focus',function(){if(term)term.focus()});
+  terminalHost.addEventListener('click',function(){if(term)term.focus()});
+
   window.addEventListener('resize',function(){if(fit){try{fit.fit()}catch(e){}}});
   connect();
+  announce('Full Console ready. Type in the terminal. Alt+B opens the accessible buffer.');
 }
 
 document.getElementById('open-buffer').onclick=openBuffer;
@@ -270,7 +508,9 @@ bufferSearch.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preven
 
 buffer.addEventListener('keydown',function(e){
   if(e.key==='Escape'){e.preventDefault();closeBuffer();return}
-  // Arrow keys on buffer dialog also move lines without touching the textarea
+  // Let the Find field keep normal caret/selection keys
+  if(document.activeElement===bufferSearch)return;
+  // Arrow keys move one line at a time; content is announced via live region only
   if(e.key==='ArrowDown'||e.key==='ArrowRight'){e.preventDefault();goToLine(lineIndex+1);return}
   if(e.key==='ArrowUp'||e.key==='ArrowLeft'){e.preventDefault();goToLine(lineIndex-1);return}
   if(e.key==='Home'){e.preventDefault();goToLine(0);return}
@@ -284,21 +524,12 @@ buffer.addEventListener('keydown',function(e){
   }
 });
 
+// Capture phase so shortcuts work even when xterm's textarea has focus
+// (bubble-phase-only listeners often never see those keys).
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'&&isMenuOpen()){e.preventDefault();setMenuOpen(false);return}
-  if(!buffer.hidden)return;
-  if(!e.altKey||e.ctrlKey||e.metaKey)return;
-  if(e.key==='F2'||e.code==='F2'||e.key.toLowerCase()==='b'){
-    e.preventDefault();
-    openBuffer();
-    return;
-  }
-  const key=e.key.toLowerCase();
-  if(key==='t'){e.preventDefault();if(term){term.focus();announce('Terminal focused.')}}
-  else if(key==='m'){e.preventDefault();if(isMenuOpen())setMenuOpen(false);else setMenuOpen(true,0)}
-  else if(key==='enter'){e.preventDefault();send('\r');if(term)term.focus();announce('Enter sent.')}
-  else if(key==='i'){e.preventDefault();send('\x03');if(term)term.focus();announce('Ctrl+C sent.')}
-});
+  handleAppShortcut(e);
+},true);
 
 init();
 })();
