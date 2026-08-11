@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Full Console — Accessible Terminal</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css">
+<script src="shared-session.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js"></script>
 <style>
@@ -85,12 +86,13 @@ kbd{font-family:Consolas,"Courier New",monospace;background:#222;border:1px soli
 <div class="panel">
 <h1 id="buffer-heading">Accessible terminal buffer</h1>
 <p id="buffer-help">Use First, Previous, Next, and Last (or arrow keys) to hear one line at a time. Escape closes. The full buffer is never placed in a single text field.</p>
-<p id="buffer-position" aria-hidden="true">Buffer is empty.</p>
-<!-- Visual preview only; full lines live in JS. aria-hidden so SRs never face a huge region. -->
-<div id="buffer-view" aria-hidden="true">
-  <div id="buffer-context"></div>
-  <div id="buffer-line-display">(no line selected)</div>
-  <div id="buffer-context-next"></div>
+<p id="buffer-position" role="status" aria-live="polite" aria-atomic="true">Buffer is empty.</p>
+<p id="buffer-help2" class="help" style="color:var(--muted);margin:0 0 8px">Current line is shown below and announced when you move. Use “Show full text” to read the entire buffer as a document.</p>
+<!-- Context lines are visual only; current line is exposed to assistive tech. -->
+<div id="buffer-view">
+  <div id="buffer-context" aria-hidden="true"></div>
+  <div id="buffer-line-display" tabindex="0" role="text" aria-label="Current buffer line">(no line selected)</div>
+  <div id="buffer-context-next" aria-hidden="true"></div>
 </div>
 <div class="toolbar" role="group" aria-label="Buffer navigation">
 <button id="buffer-first" type="button">First line</button>
@@ -98,7 +100,13 @@ kbd{font-family:Consolas,"Courier New",monospace;background:#222;border:1px soli
 <button id="buffer-next" type="button">Next line</button>
 <button id="buffer-last" type="button">Last line</button>
 <button id="buffer-refresh" type="button">Refresh buffer</button>
+<button id="buffer-show-full" type="button">Show full text</button>
 <button id="buffer-close" type="button">Close buffer</button>
+</div>
+<div id="buffer-full-wrap" hidden style="margin-top:10px;display:none;flex-direction:column;gap:8px;flex:1;min-height:0">
+  <label for="buffer-full-text">Full terminal buffer text</label>
+  <textarea id="buffer-full-text" readonly spellcheck="false" style="flex:1;min-height:12rem;width:100%;background:#000;color:var(--text);border:1px solid var(--border);padding:10px;font:15px/1.4 Consolas,monospace"></textarea>
+  <button id="buffer-hide-full" type="button">Hide full text</button>
 </div>
 <div class="row" role="search" aria-label="Find in buffer">
 <label for="buffer-search">Find in buffer</label>
@@ -161,12 +169,18 @@ function appendToOutputHistory(raw){
   if(!raw)return;
   const clean=stripAnsi(raw);
   if(!clean)return;
-  outputHistoryPending+=clean;
+  // Normalize CRLF / lone CR so line splitting is reliable on Windows PTY output.
+  const normalized=clean.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  outputHistoryPending+=normalized;
   const parts=outputHistoryPending.split('\n');
   outputHistoryPending=parts.pop()||'';
   for(let i=0;i<parts.length;i++){
-    const line=normalizeSpeechLine(parts[i]);
+    // Keep lines that have any non-whitespace; also keep pure prompts that normalize to empty
+    // only when the raw trimmed form still has printable content.
+    const rawLine=parts[i].replace(/\u00a0/g,' ').replace(/[\t ]+$/,'');
+    const line=normalizeSpeechLine(rawLine);
     if(line)outputHistory.push(line);
+    else if(rawLine.replace(/\s/g,'').length)outputHistory.push(rawLine.trim());
   }
   // Cap history so the accessible buffer stays usable
   const MAX=2000;
@@ -552,13 +566,17 @@ function goToLine(index,opts){
 }
 
 function loadBufferFromTerminal(){
-  // Prefer the parallel clean-text history (reliable for accessibility).
-  // Fall back to scraping xterm's cell buffer only when history is empty
-  // (e.g. very early after connect before any data arrived).
-  if(outputHistory.length){
-    bufferLines=outputHistory.slice();
+  // Merge parallel history with xterm cell scrape so the accessible buffer is never
+  // empty when either source has content (history can lag; scrape can miss ANSI-cleaned text).
+  const fromHistory=outputHistory.slice();
+  const fromTerm=captureLines().map(function(l){return normalizeSpeechLine(stripAnsi(l))||String(l||'').trim()}).filter(Boolean);
+  if(fromHistory.length && fromTerm.length){
+    // Prefer history (cleaner) when it has at least as many lines; otherwise use the longer source.
+    bufferLines = fromHistory.length >= fromTerm.length ? fromHistory : fromTerm;
+  }else if(fromHistory.length){
+    bufferLines=fromHistory;
   }else{
-    bufferLines=captureLines();
+    bufferLines=fromTerm;
   }
   bufferFingerprint=fingerprintLines(bufferLines);
   return bufferLines;
@@ -584,7 +602,10 @@ function openBuffer(){
   const firstBtn=document.getElementById('buffer-first');
   if(firstBtn)firstBtn.focus();
   if(!lines.length){
-    announce('Buffer opened. Empty.');
+    const connected=socket&&socket.readyState===WebSocket.OPEN;
+    announce(connected
+      ?'Buffer opened. Empty. No terminal output has been received yet. Type a command in the terminal or Command field, then press Refresh buffer.'
+      :'Buffer opened. Empty. Terminal is not connected.');
   }else{
     announce('Buffer opened. '+lines.length+' lines. First line: '+displayLine(lines[0]));
   }
@@ -619,8 +640,12 @@ function closeBuffer(){
 function refreshBuffer(opts){
   opts=opts||{};
   const prior=lineIndex;
-  // Prefer parallel history; fall back to xterm scrape only when history is empty.
-  const lines=outputHistory.length?outputHistory.slice():captureLines();
+  // Same merge policy as loadBufferFromTerminal.
+  const fromHistory=outputHistory.slice();
+  const fromTerm=captureLines().map(function(l){return normalizeSpeechLine(stripAnsi(l))||String(l||'').trim()}).filter(Boolean);
+  const lines=(fromHistory.length&&fromTerm.length)
+    ?(fromHistory.length>=fromTerm.length?fromHistory:fromTerm)
+    :(fromHistory.length?fromHistory:fromTerm);
   const fp=fingerprintLines(lines);
   if(fp===bufferFingerprint&&!opts.force){
     if(!opts.silent)announce('No new output.');
@@ -663,7 +688,7 @@ function bufferFind(direction){
 
 function connect(){
   const protocol=location.protocol==='https:'?'wss://':'ws://';
-  socket=new WebSocket(protocol+location.host+'/ws');
+  socket=new WebSocket(typeof window.accessibleTerminalWebSocketUrl==='function'?window.accessibleTerminalWebSocketUrl():(protocol+location.host+'/ws'));
   socket.addEventListener('open',function(){
     status.textContent='Connected to PowerShell PTY.';
     let cwd='';
@@ -802,6 +827,34 @@ function init(){
 document.getElementById('open-buffer').onclick=openBuffer;
 document.getElementById('buffer-refresh').onclick=function(){refreshBuffer({force:true})};
 document.getElementById('buffer-close').onclick=closeBuffer;
+(function(){
+  const fullWrap=document.getElementById('buffer-full-wrap');
+  const fullText=document.getElementById('buffer-full-text');
+  const showBtn=document.getElementById('buffer-show-full');
+  const hideBtn=document.getElementById('buffer-hide-full');
+  function showFull(){
+    const lines=getLines();
+    if(fullText){
+      fullText.value=lines.length?lines.join('\n'):'(Buffer is empty.)';
+    }
+    if(fullWrap){
+      fullWrap.hidden=false;
+      fullWrap.style.display='flex';
+    }
+    if(fullText){
+      fullText.focus();
+      try{fullText.setSelectionRange(0,0)}catch(e){}
+    }
+    announce(lines.length?('Full text shown. '+lines.length+' lines.'):'Full text shown. Buffer is empty.');
+  }
+  function hideFull(){
+    if(fullWrap){fullWrap.hidden=true;fullWrap.style.display='none'}
+    if(showBtn)showBtn.focus();
+    announce('Full text hidden.');
+  }
+  if(showBtn)showBtn.addEventListener('click',showFull);
+  if(hideBtn)hideBtn.addEventListener('click',hideFull);
+})();
 document.getElementById('send-enter').onclick=function(){send('\r');if(term)term.focus();announce('Enter sent.')};
 document.getElementById('send-ctrl-c').onclick=function(){send('\x03');if(term)term.focus();announce('Ctrl+C sent.')};
 document.getElementById('clear').onclick=function(){
