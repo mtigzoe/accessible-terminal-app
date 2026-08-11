@@ -1,0 +1,235 @@
+From e760c464322653428369af8ccb93d3fe9491bc68 Mon Sep 17 00:00:00 2001
+From: Grok <grok@x.ai>
+Date: Mon, 10 Aug 2026 23:42:37 +0000
+Subject: [PATCH 1/2] Fix Tab completion, key announcements, and accessible
+ buffer capture on console.html
+
+- Allow Tab to reach the PTY for shell completions when the terminal has focus;
+  only intercept Tab for page focus cycling when focus is outside the terminal.
+- Announce Tab keystrokes so they are not silent to screen readers.
+- Make captureLines more robust against differing xterm buffer shapes and
+  extraction errors so the accessible buffer receives terminal output.
+---
+ public/console.html | 47 +++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 39 insertions(+), 8 deletions(-)
+
+diff --git a/public/console.html b/public/console.html
+index e1d88ab..c437b0d 100644
+--- a/public/console.html
++++ b/public/console.html
+@@ -221,6 +221,9 @@ function handleLocalInput(data){
+         announce('Enter');
+       }
+       typedDraft='';
++    }else if(code===9){
++      // Tab is used for shell completion; announce it so the keystroke is not silent.
++      announce('Tab');
+     }else if(code===127||code===8){
+       if(typedDraft.length){
+         typedDraft=typedDraft.slice(0,-1);
+@@ -295,15 +298,22 @@ function handleAppShortcut(e){
+     return false;
+   }
+   if(buffer.hidden && e.key==='Tab'){
++    // Allow Tab to reach the PTY for shell completions when the terminal has focus.
++    // Only intercept Tab for page focus cycling when focus is outside the terminal.
++    const active=document.activeElement;
++    const inTerminal=!!(term&&(active===terminalHost||active===term.textarea||(terminalHost&&terminalHost.contains(active))));
++    if(inTerminal){
++      return false; // do not preventDefault; let xterm/onData deliver Tab to the shell
++    }
+     e.preventDefault();
+     e.stopPropagation();
+-    const focusable=getFocusable(document.body).filter(function(el){return el!==terminalHost && el!==term.textarea&&typeof el.focus==='function'});
++    const focusable=getFocusable(document.body).filter(function(el){return el!==terminalHost && !(term&&el===term.textarea)&&typeof el.focus==='function'});
+     if(!focusable.length)return false;
+     const current=document.activeElement;
+     const idx=focusable.indexOf(current);
+     const next=idx<0||idx>=focusable.length-1?focusable[0]:focusable[idx+1];
+     try{next.focus()}catch(err){}
+-    return false;
++    return true;
+   }
+   return false;
+ }
+@@ -321,15 +331,36 @@ document.addEventListener('click',function(event){if(!menuToggle.contains(event.
+ /** Capture terminal buffer into a JS array only — never dump the full text into the DOM. */
+ function captureLines(){
+   if(!term)return[];
+-  let b=term.buffer&&term.buffer.active?term.buffer.active:null;
+-  if(!b&&term.buffer&&term.buffer.lines)b=term.buffer;
++  let b=null;
++  try{
++    if(term.buffer&&term.buffer.active)b=term.buffer.active;
++    else if(term.buffer)b=term.buffer;
++  }catch(err){}
+   if(!b)return[];
+   const lines=[];
+-  const len=typeof b.length==='number'?b.length:0;
+-  for(let i=0;i<len;i++){
+-    const line=b.getLine?b.getLine(i):null;
+-    lines.push(line?line.translateToString?line.translateToString(true):String(line):'');
++  let len=0;
++  try{len=typeof b.length==='number'?b.length:0}catch(err){}
++  // Prefer full scrollback+viewport via getLine when available.
++  if(typeof b.getLine==='function'&&len>0){
++    for(let i=0;i<len;i++){
++      let text='';
++      try{
++        const line=b.getLine(i);
++        if(line){
++          if(typeof line.translateToString==='function')text=line.translateToString(true);
++          else text=String(line);
++        }
++      }catch(err){}
++      lines.push(text);
++    }
++  }else if(b.lines&&typeof b.lines.length==='number'){
++    // Fallback for older buffer shapes
++    for(let i=0;i<b.lines.length;i++){
++      const line=b.lines.get?b.lines.get(i):b.lines[i];
++      lines.push(line&&line.translateToString?line.translateToString(true):'');
++    }
+   }
++  // Drop trailing blank lines that are only padding in the buffer
+   while(lines.length&&lines[lines.length-1]==='')lines.pop();
+   return lines;
+ }
+-- 
+2.43.0
+
+
+From 72130beb8e5d48513f3fc2414bf46b9fd8840656 Mon Sep 17 00:00:00 2001
+From: Grok <grok@x.ai>
+Date: Mon, 10 Aug 2026 23:56:17 +0000
+Subject: [PATCH 2/2] Make accessible buffer reliably show terminal output on
+ console.html
+
+Relying solely on scraping xterm's internal cell buffer could leave the
+accessible buffer empty (timing, history replay, or buffer-shape issues).
+
+- Maintain a parallel clean-text outputHistory from every PTY message
+  (including history replay).
+- Prefer that history when opening or refreshing the accessible buffer;
+  fall back to xterm scrape only when history is still empty.
+- Flush any pending partial line when the buffer is opened.
+- Clear the parallel history when the screen is cleared.
+---
+ public/console.html | 52 +++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 48 insertions(+), 4 deletions(-)
+
+diff --git a/public/console.html b/public/console.html
+index c437b0d..8c1aa9a 100644
+--- a/public/console.html
++++ b/public/console.html
+@@ -103,6 +103,9 @@ kbd{font-family:Consolas,"Courier New",monospace;background:#222;border:1px soli
+ 'use strict';
+ const status=document.getElementById('status'),sr=document.getElementById('sr-status'),alertBox=document.getElementById('sr-alert'),mainView=document.getElementById('main-view'),buffer=document.getElementById('accessible-buffer'),bufferPosition=document.getElementById('buffer-position'),bufferLineDisplay=document.getElementById('buffer-line-display'),bufferContext=document.getElementById('buffer-context'),bufferContextNext=document.getElementById('buffer-context-next'),bufferSearch=document.getElementById('buffer-search'),menuToggle=document.getElementById('menu-toggle'),menuPanel=document.getElementById('menu-panel'),menuItems=Array.from(menuPanel.querySelectorAll('[role="menuitem"]')),terminalHost=document.getElementById('terminal');
+ let socket=null,term=null,fit=null,autoRefreshTimer=null,lastFocused=null,lineIndex=0,bufferLines=[],bufferFingerprint='';
++// Parallel clean-text history for the accessible buffer (independent of xterm cell buffer).
++// This guarantees the buffer has readable output even if xterm buffer scraping is empty or delayed.
++let outputHistory=[],outputHistoryPending='';
+ // Live terminal speech: complete PTY lines + local key feedback (xterm SR mode stays off)
+ let outputPending='',outputFlushTimer=null,typedDraft='',lastSentCommand='',lastSentCommandTimeout=null,suppressOutputSpeech=false;
+ 
+@@ -124,6 +127,23 @@ function normalizeSpeechLine(text){
+   return String(text).replace(/\s+/g,' ').trim();
+ }
+ 
++/** Append cleaned PTY text to the parallel history used by the accessible buffer. */
++function appendToOutputHistory(raw){
++  if(!raw)return;
++  const clean=stripAnsi(raw);
++  if(!clean)return;
++  outputHistoryPending+=clean;
++  const parts=outputHistoryPending.split('\n');
++  outputHistoryPending=parts.pop()||'';
++  for(let i=0;i<parts.length;i++){
++    const line=normalizeSpeechLine(parts[i]);
++    if(line)outputHistory.push(line);
++  }
++  // Cap history so the accessible buffer stays usable
++  const MAX=2000;
++  if(outputHistory.length>MAX)outputHistory=outputHistory.slice(outputHistory.length-MAX);
++}
++
+ function flushOutputAnnounce(){
+   outputFlushTimer=null;
+   // Accessible buffer owns speech while open
+@@ -406,7 +426,14 @@ function goToLine(index,opts){
+ }
+ 
+ function loadBufferFromTerminal(){
+-  bufferLines=captureLines();
++  // Prefer the parallel clean-text history (reliable for accessibility).
++  // Fall back to scraping xterm's cell buffer only when history is empty
++  // (e.g. very early after connect before any data arrived).
++  if(outputHistory.length){
++    bufferLines=outputHistory.slice();
++  }else{
++    bufferLines=captureLines();
++  }
+   bufferFingerprint=fingerprintLines(bufferLines);
+   return bufferLines;
+ }
+@@ -416,6 +443,12 @@ function openBuffer(){
+   suppressOutputSpeech=true;
+   if(outputFlushTimer){clearTimeout(outputFlushTimer);outputFlushTimer=null}
+   outputPending='';
++  // Flush any partial line still held for the parallel history so the buffer is complete.
++  if(outputHistoryPending){
++    const pending=normalizeSpeechLine(outputHistoryPending);
++    if(pending)outputHistory.push(pending);
++    outputHistoryPending='';
++  }
+   mainView.setAttribute('inert','');
+   mainView.setAttribute('aria-hidden','true');
+   const lines=loadBufferFromTerminal();
+@@ -460,7 +493,8 @@ function closeBuffer(){
+ function refreshBuffer(opts){
+   opts=opts||{};
+   const prior=lineIndex;
+-  const lines=captureLines();
++  // Prefer parallel history; fall back to xterm scrape only when history is empty.
++  const lines=outputHistory.length?outputHistory.slice():captureLines();
+   const fp=fingerprintLines(lines);
+   if(fp===bufferFingerprint&&!opts.force){
+     if(!opts.silent)announce('No new output.');
+@@ -519,7 +553,9 @@ function connect(){
+         const msg=JSON.parse(text);
+         if(msg.type==='history'&&typeof msg.data==='string'){
+           term.write(msg.data);
+-          // History replay: do not flood the SR; user can open the buffer
++          // Feed the parallel history so the accessible buffer has content after reconnect/replay.
++          // Do not flood live-region speech for history.
++          appendToOutputHistory(msg.data);
+           return;
+         }
+       }catch(err){}
+@@ -540,6 +576,7 @@ function connect(){
+     }
+     
+     term.write(text);
++    appendToOutputHistory(text);
+     scheduleOutputAnnounce(text);
+     if(!buffer.hidden)scheduleAutoRefresh();
+   });
+@@ -619,7 +656,14 @@ document.getElementById('buffer-refresh').onclick=function(){refreshBuffer({forc
+ document.getElementById('buffer-close').onclick=closeBuffer;
+ document.getElementById('send-enter').onclick=function(){send('\r');if(term)term.focus();announce('Enter sent.')};
+ document.getElementById('send-ctrl-c').onclick=function(){send('\x03');if(term)term.focus();announce('Ctrl+C sent.')};
+-document.getElementById('clear').onclick=function(){if(term)term.clear();announce('Screen cleared.')};
++document.getElementById('clear').onclick=function(){
++  if(term)term.clear();
++  outputHistory=[];
++  outputHistoryPending='';
++  bufferLines=[];
++  bufferFingerprint='';
++  announce('Screen cleared.');
++};
+ document.getElementById('accessible-mode').onclick=function(){try{localStorage.setItem('console-mode','accessible')}catch(e){}location.href='interactive_console.html'};
+ document.getElementById('buffer-first').onclick=function(){goToLine(0)};
+ document.getElementById('buffer-prev').onclick=function(){goToLine(lineIndex-1)};
+-- 
+2.43.0
+

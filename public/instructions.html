@@ -34,8 +34,8 @@ th{background:#1a1a1a;color:var(--accent)}
 <nav class="app-menu" aria-label="Main menu">
 <button type="button" class="menu-toggle" id="menu-toggle" aria-expanded="false" aria-controls="menu-panel" aria-haspopup="menu">Menu</button>
 <ul class="menu-panel" id="menu-panel" role="menu" data-open="false" hidden>
-<li role="none"><a role="menuitem" href="interactive_console.html" tabindex="-1">Interactive console</a></li>
-<li role="none"><a role="menuitem" href="console.html" tabindex="-1">Full Console</a></li>
+<li role="none"><a role="menuitem" href="interactive_console.html" tabindex="-1">Interactive Console (recommended)</a></li>
+<li role="none"><a role="menuitem" href="console.html" tabindex="-1">Full Console (visual / advanced)</a></li>
 <li role="none"><a role="menuitem" href="instructions.html" aria-current="page" tabindex="-1">Instructions</a></li>
 <li role="none"><a role="menuitem" href="settings.html" tabindex="-1">Settings</a></li>
 </ul>
@@ -52,8 +52,8 @@ th{background:#1a1a1a;color:var(--accent)}
 <section class="panel" aria-labelledby="views-heading">
 <h2 id="views-heading">Terminal views</h2>
 <ul>
-<li><strong>Interactive console</strong> (<code>interactive_console.html</code>) — purpose-built for JAWS, NVDA, and Braille. Line-by-line output, stable history and Tab completion, review mode, and bookmarks.</li>
-<li><strong>Full Console</strong> (<code>console.html</code>) — xterm.js visual terminal plus an accessible buffer overlay for reading output with a screen reader.</li>
+<li><strong>Interactive Console</strong> (<code>interactive_console.html</code>) — <strong>default and recommended for screen readers</strong> (JAWS, NVDA, Braille). Line-by-line output, stable command field, Tab completion, review mode, and bookmarks.</li>
+<li><strong>Full Console</strong> (<code>console.html</code>) — optional visual xterm.js terminal for interactive TTY programs. Prefer Interactive Console for everyday screen-reader use.</li>
 </ul>
 </section>
 
@@ -66,7 +66,7 @@ th{background:#1a1a1a;color:var(--accent)}
 <li>Press <kbd>Enter</kbd> or <kbd>Space</kbd> to open the focused item.</li>
 <li>Press <kbd>Escape</kbd> to close the menu and return focus to the Menu button.</li>
 </ul>
-<p>Menu items: Interactive console, Full Console, Instructions, Settings.</p>
+<p>Menu items: Interactive Console (recommended), Full Console (visual / advanced), Instructions, Settings.</p>
 </section>
 
 <section class="panel" aria-labelledby="ic-heading">

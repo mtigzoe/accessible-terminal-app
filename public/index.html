@@ -4,22 +4,22 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Accessible PowerShell</title>
-<meta http-equiv="refresh" content="0; url=interactive-console.html">
+<meta http-equiv="refresh" content="0; url=interactive_console.html">
 <script>
 (function () {
   try {
-    var hc = localStorage.getItem('terminal-high-contrast') === 'true';
-    var fs = localStorage.getItem('terminal-font-size') || 'medium';
-    document.documentElement.setAttribute('data-high-contrast', hc ? 'true' : 'false');
-    document.documentElement.setAttribute('data-font-size', fs);
+    var mode = localStorage.getItem('console-mode') || localStorage.getItem('terminal-console-mode') || 'accessible';
+    if (mode === 'full') {
+      location.replace('console.html');
+      return;
+    }
   } catch (e) {}
+  location.replace('interactive_console.html');
 })();
 </script>
 </head>
 <body>
-<noscript>
-<meta http-equiv="refresh" content="0; url=interactive-console.html">
-</noscript>
-<p>Redirecting to the <a href="interactive-console.html">Interactive console</a>…</p>
+<p>Redirecting to the <a href="interactive_console.html">Interactive Console</a> (recommended for screen readers)…</p>
+<p>Optional: <a href="console.html">Full Console (visual / advanced)</a></p>
 </body>
 </html>
