@@ -1,0 +1,62 @@
+- generic [ref=f4e1]:
+  - navigation "Main menu" [ref=f4e2]:
+    - button "Menu" [ref=f4e3] [cursor=pointer]
+  - link "Skip to interactive keyboard input" [ref=f4e4] [cursor=pointer]:
+    - /url: "#input"
+  - link "Skip to terminal output" [ref=f4e5] [cursor=pointer]:
+    - /url: "#output"
+  - main [ref=f4e6]:
+    - region [ref=f4e7]:
+      - heading "Interactive Accessible Console" [level=1] [ref=f4e8]
+      - status [ref=f4e9]: Connected to the Windows PowerShell PTY.
+      - paragraph [ref=f4e10]: Direct PowerShell PTY with stable history and Tab completion. Colours are visual only; screen-reader and Braille text stays plain. Review mode keeps focus on your line while new output arrives. Bookmark lines for quick return.
+    - region [ref=f4e11]:
+      - heading "Terminal output" [level=2] [ref=f4e12]
+      - log "Terminal output. Alt+F2 focuses this region." [ref=f4e13]:
+        - 'button "Line 1: PS C:\\Users\\Miriam>" [ref=f4e61] [cursor=pointer]': PS C:\Users\Miriam>
+        - 'button "Line 2: PS C:\\Users\\Miriam>" [ref=f4e62] [cursor=pointer]': PS C:\Users\Miriam>
+        - 'button "Line 3: PS C:\\Users\\Miriam>" [ref=f4e63] [cursor=pointer]': PS C:\Users\Miriam>
+        - 'button "Line 4: PS C:\\Users\\Miriam>" [ref=f4e64] [cursor=pointer]': PS C:\Users\Miriam>
+      - status [ref=f4e14]: Line 4 of 4.
+      - status [ref=f4e15]: "Follow mode: new output moves focus to the latest line."
+      - toolbar "Terminal output navigation" [ref=f4e16]:
+        - button "Read latest output" [ref=f4e17] [cursor=pointer]
+        - button "Previous line" [ref=f4e18] [cursor=pointer]
+        - button "Next line" [ref=f4e19] [cursor=pointer]
+        - button "First line" [ref=f4e20] [cursor=pointer]
+        - button "Last line" [ref=f4e21] [cursor=pointer]
+        - button "Bookmark line" [ref=f4e22] [cursor=pointer]
+        - button "Go to bookmark" [ref=f4e23] [cursor=pointer]
+        - button "Pause auto-follow" [ref=f4e24] [cursor=pointer]
+        - button "Clear output view" [ref=f4e25] [cursor=pointer]
+      - paragraph [ref=f4e26]: Alt+F2 or Alt+O focus output. Alt+F review mode. Alt+K bookmark. Alt+J go to bookmark. Alt+L latest. Alt+M menu.
+    - region [ref=f4e27]:
+      - heading "Search terminal output" [level=2] [ref=f4e28]
+      - search [ref=f4e29]:
+        - generic [ref=f4e30]: Search text
+        - searchbox "Search text" [ref=f4e31]
+        - button "Find next" [ref=f4e32] [cursor=pointer]
+        - button "Find previous" [ref=f4e33] [cursor=pointer]
+      - paragraph [ref=f4e34]: Search announces match position and total matches.
+    - region [ref=f4e35]:
+      - heading "Interactive keyboard input" [level=2] [ref=f4e36]
+      - generic [ref=f4e37]: Interactive keyboard input to the PowerShell PTY
+      - textbox "Interactive keyboard input to the PowerShell PTY" [active] [ref=f4e38]
+      - paragraph [ref=f4e39]: "History and Tab keep the command line stable. Shortcuts: Alt+F2/Alt+O output, Alt+M menu, Alt+C input, Alt+F follow/review, Alt+L latest, Alt+K bookmark, Alt+J go to bookmark."
+      - toolbar "Terminal control actions" [ref=f4e40]:
+        - button "Send Ctrl+C (interrupt)" [ref=f4e41] [cursor=pointer]
+        - button "Send Ctrl+D (EOF)" [ref=f4e42] [cursor=pointer]
+        - button "Clear input field" [ref=f4e43] [cursor=pointer]
+        - button "Focus input" [ref=f4e44] [cursor=pointer]
+    - region [ref=f4e45]:
+      - heading "Working Directory" [level=2] [ref=f4e46]
+      - generic [ref=f4e47]:
+        - generic [ref=f4e48]: Full path
+        - textbox "Full path" [ref=f4e49]:
+          - /placeholder: "Example: C:\\Users\\YourName\\Documents"
+          - text: C:\Users\Miriam
+        - button "Choose a folder" [ref=f4e50] [cursor=pointer]
+        - button "Set directory" [ref=f4e51] [cursor=pointer]
+      - paragraph [ref=f4e52]: Folder picker (Electron) or type a full Windows path, then Set directory.
+    - status [ref=f4e53]: Enter sent.
+    - alert [ref=f4e54]
