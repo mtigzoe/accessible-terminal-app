@@ -43,9 +43,14 @@ body{margin:0;padding:12px;padding-top:56px;background:var(--panel);color:var(--
 .skip-link:focus{left:16px;top:16px}
 kbd{font-family:Consolas,"Courier New",monospace;background:#222;border:1px solid var(--border);border-radius:3px;padding:1px 5px;font-size:.9em}
 .shortcuts-help{color:var(--muted);font-size:.88rem;margin:0 0 8px}
+.cmd-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 10px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:6px}
+.cmd-row label{color:var(--muted);white-space:nowrap}
+#accessible-cmd{flex:1;min-width:12rem;background:#000;color:var(--text);border:1px solid var(--border);border-radius:4px;padding:8px 10px;font:15px/1.3 Consolas,"Courier New",monospace}
+#terminal{height:calc(100vh - 168px)}
 </style>
 </head>
 <body>
+<a class="skip-link" href="#accessible-cmd">Skip to accessible command</a>
 <a class="skip-link" href="#terminal">Skip to terminal</a>
 <a class="skip-link" href="#open-buffer">Skip to accessible buffer button</a>
 <div id="main-view">
@@ -66,8 +71,15 @@ kbd{font-family:Consolas,"Courier New",monospace;background:#222;border:1px soli
 <button id="accessible-mode" type="button">Switch to Interactive Console</button>
 <span id="status" class="status" role="status" aria-live="polite" aria-atomic="true">Connecting…</span>
 </div>
-<p class="shortcuts-help" id="shortcuts-help">Shortcuts: <kbd>Alt+F2</kbd> or <kbd>Alt+B</kbd> accessible buffer, <kbd>Alt+T</kbd> terminal, <kbd>Alt+M</kbd> menu, <kbd>Alt+Enter</kbd> Enter, <kbd>Alt+I</kbd> Ctrl+C, <kbd>Escape</kbd> close buffer.</p>
-<div id="terminal" role="application" aria-label="Terminal. Type commands here. Press Alt+B or Alt+F2 to open the accessible buffer. Output is announced as it arrives." tabindex="0"></div>
+<p class="shortcuts-help" id="shortcuts-help">Shortcuts: <kbd>Alt+F2</kbd> or <kbd>Alt+B</kbd> accessible buffer, <kbd>Alt+C</kbd> accessible command, <kbd>Alt+T</kbd> terminal, <kbd>Alt+M</kbd> menu, <kbd>Alt+R</kbd> read current command, <kbd>Alt+Enter</kbd> Enter, <kbd>Alt+I</kbd> Ctrl+C, <kbd>Escape</kbd> close buffer. Tab in the command field uses PowerShell completion.</p>
+<div class="cmd-row" role="group" aria-labelledby="cmd-label">
+<label id="cmd-label" for="accessible-cmd">Command</label>
+<input id="accessible-cmd" type="text" autocomplete="off" spellcheck="false" aria-describedby="cmd-help" placeholder="Type a command — screen readers read this field">
+<button id="cmd-run" type="button" class="primary">Run</button>
+<button id="cmd-clear" type="button">Clear</button>
+</div>
+<p id="cmd-help" class="shortcuts-help">This is a normal text field. Type here for full screen-reader support. Enter or Run sends the command to PowerShell. Tab completes. The visual terminal below remains available for interactive programs.</p>
+<div id="terminal" role="application" aria-label="Terminal. Type commands here or use the Command field above. Press Alt+B or Alt+F2 to open the accessible buffer. Output is announced as it arrives." tabindex="0"></div>
 </div>
 <div id="accessible-buffer" hidden role="dialog" aria-modal="true" aria-labelledby="buffer-heading" aria-describedby="buffer-help">
 <div class="panel">
@@ -102,12 +114,29 @@ kbd{font-family:Consolas,"Courier New",monospace;background:#222;border:1px soli
 (function(){
 'use strict';
 const status=document.getElementById('status'),sr=document.getElementById('sr-status'),alertBox=document.getElementById('sr-alert'),mainView=document.getElementById('main-view'),buffer=document.getElementById('accessible-buffer'),bufferPosition=document.getElementById('buffer-position'),bufferLineDisplay=document.getElementById('buffer-line-display'),bufferContext=document.getElementById('buffer-context'),bufferContextNext=document.getElementById('buffer-context-next'),bufferSearch=document.getElementById('buffer-search'),menuToggle=document.getElementById('menu-toggle'),menuPanel=document.getElementById('menu-panel'),menuItems=Array.from(menuPanel.querySelectorAll('[role="menuitem"]')),terminalHost=document.getElementById('terminal');
+const cmdInput=document.getElementById('accessible-cmd'),cmdRun=document.getElementById('cmd-run'),cmdClear=document.getElementById('cmd-clear');
 let socket=null,term=null,fit=null,autoRefreshTimer=null,lastFocused=null,lineIndex=0,bufferLines=[],bufferFingerprint='';
 // Parallel clean-text history for the accessible buffer (independent of xterm cell buffer).
 // This guarantees the buffer has readable output even if xterm buffer scraping is empty or delayed.
 let outputHistory=[],outputHistoryPending='';
 // Live terminal speech: complete PTY lines + local key feedback (xterm SR mode stays off)
-let outputPending='',outputFlushTimer=null,typedDraft='',lastSentCommand='',lastSentCommandTimeout=null,suppressOutputSpeech=false;
+let outputPending='',outputFlushTimer=null,typedDraft='',lastSentCommand='',lastSentCommandTimeout=null,suppressOutputSpeech=false,awaitingCompletion=false,awaitingCompletionTimer=null;
+let completion={matches:[],index:0,baseLine:'',replacementIndex:0,replacementLength:0};
+let completionPending=false,completionRequestId=0,applyingCompletion=false,syncingCmd=false;
+function getCurrentCwd(){try{return localStorage.getItem('terminal-last-path')||''}catch(e){return ''}}
+function setTypedDraft(value,opts){
+  opts=opts||{};
+  typedDraft=String(value||'');
+  if(!opts.skipInput&&cmdInput&&!applyingCompletion){
+    syncingCmd=true;
+    cmdInput.value=typedDraft;
+    if(opts.caret!=null){try{cmdInput.setSelectionRange(opts.caret,opts.caret)}catch(e){}}
+    else{try{const p=cmdInput.value.length;cmdInput.setSelectionRange(p,p)}catch(e){}}
+    syncingCmd=false;
+  }
+}
+function resetCompletion(){completion={matches:[],index:0,baseLine:'',replacementIndex:0,replacementLength:0};completionPending=false}
+
 
 function createAnnouncer(el){const queue=[];let active=false;const GAP_MS=280;function playNext(){if(queue.length===0){active=false;return}active=true;const text=queue.shift();el.textContent='';window.setTimeout(function(){el.textContent=text;window.setTimeout(playNext,GAP_MS)},40)}return function(text){if(!text)return;queue.push(String(text));while(queue.length>8)queue.shift();if(!active)playNext()}}
 const announcePolite=createAnnouncer(sr),announceAssertive=createAnnouncer(alertBox);
@@ -240,17 +269,21 @@ function handleLocalInput(data){
         lastSentCommand='';
         announce('Enter');
       }
-      typedDraft='';
+      setTypedDraft('');
+      resetCompletion();
     }else if(code===9){
-      // Tab is used for shell completion; announce it so the keystroke is not silent.
+      // Tab is used for shell completion. Mark that the next PTY rewrite may be a completion.
       announce('Tab');
+      awaitingCompletion=true;
+      if(awaitingCompletionTimer)clearTimeout(awaitingCompletionTimer);
+      awaitingCompletionTimer=setTimeout(function(){awaitingCompletion=false;awaitingCompletionTimer=null},1200);
     }else if(code===127||code===8){
       if(typedDraft.length){
-        typedDraft=typedDraft.slice(0,-1);
+        setTypedDraft(typedDraft.slice(0,-1));
         announce('backspace');
       }
     }else if(code===3){
-      typedDraft='';
+      setTypedDraft('');
       lastSentCommand='';
       if(lastSentCommandTimeout){clearTimeout(lastSentCommandTimeout);lastSentCommandTimeout=null}
       announce('Ctrl+C');
@@ -267,10 +300,88 @@ function handleLocalInput(data){
     }else if(code===12){
       announce('Control L');
     }else if(code>=32){
-      typedDraft+=ch;
+      setTypedDraft(typedDraft+ch);
       announce(ch===' '?'space':ch);
     }
   }
+}
+
+
+function applyCompletionMatch(index){
+  if(!completion.matches.length)return;
+  index=((index%completion.matches.length)+completion.matches.length)%completion.matches.length;
+  const match=completion.matches[index];
+  completion.index=index;
+  if(completion.matches.length===1)announce('Completed: '+match);
+  else announce((index+1)+' of '+completion.matches.length+': '+match);
+  const before=completion.baseLine.slice(0,completion.replacementIndex);
+  const after=completion.baseLine.slice(completion.replacementIndex+completion.replacementLength);
+  const newLine=before+match+after;
+  const caret=before.length+match.length;
+  applyingCompletion=true;
+  setTypedDraft(newLine,{caret:caret});
+  applyingCompletion=false;
+}
+function cycleCompletion(direction){
+  const n=completion.matches.length;
+  if(!n)return;
+  applyCompletionMatch((completion.index+direction+n)%n);
+}
+function requestTabCompletion(direction){
+  if(completion.matches.length>0){cycleCompletion(direction);return}
+  if(completionPending)return;
+  const line=cmdInput?cmdInput.value:typedDraft;
+  const cursor=(cmdInput&&typeof cmdInput.selectionStart==='number')?cmdInput.selectionStart:line.length;
+  const baseLine=line;
+  completionPending=true;
+  completionRequestId+=1;
+  const id=completionRequestId;
+  fetch('/api/complete',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:id,line:line,cursor:cursor,cwd:getCurrentCwd()||undefined})
+  }).then(function(r){
+    if(!r.ok)throw new Error('Completion failed ('+r.status+').');
+    return r.json();
+  }).then(function(msg){
+    completionPending=false;
+    if(msg&&msg.id!=null&&msg.id!==completionRequestId)return;
+    const matches=Array.isArray(msg.matches)?msg.matches:(typeof msg.matches==='string'?[msg.matches]:[]);
+    if(!matches.length){
+      resetCompletion();
+      announce(msg.error?('No completions. '+msg.error):'No completions.');
+      return;
+    }
+    completion.baseLine=baseLine;
+    completion.replacementIndex=typeof msg.replacementIndex==='number'?msg.replacementIndex:0;
+    completion.replacementLength=typeof msg.replacementLength==='number'?msg.replacementLength:0;
+    completion.matches=matches;
+    applyCompletionMatch(0);
+  }).catch(function(err){
+    completionPending=false;
+    resetCompletion();
+    announce(err&&err.message?err.message:'Completion request failed.');
+  });
+}
+function runAccessibleCommand(){
+  const cmd=(cmdInput?cmdInput.value:typedDraft).replace(/\r?\n/g,'');
+  if(!cmd.trim()){
+    // Empty Enter still useful for prompts / pagers
+    send('\r');
+    announce('Enter');
+    if(term)term.focus();
+    return;
+  }
+  lastSentCommand=normalizeSpeechLine(cmd);
+  if(lastSentCommandTimeout)clearTimeout(lastSentCommandTimeout);
+  lastSentCommandTimeout=setTimeout(function(){lastSentCommand='';lastSentCommandTimeout=null},3000);
+  // Send the full line then Enter so the PTY receives a complete command.
+  // Prefer writing the line if the visual prompt is empty; always send Enter.
+  send(cmd+'\r');
+  announce('Sent: '+lastSentCommand);
+  setTypedDraft('');
+  resetCompletion();
+  if(term)term.focus();
 }
 
 /** Shared shortcut handler. Returns true if the event was handled. */
@@ -313,6 +424,21 @@ function handleAppShortcut(e){
       typedDraft='';
       if(term)term.focus();
       announce('Ctrl+C sent.');
+      return true;
+    }
+    // Alt+C focuses the accessible command text field; Alt+R announces its value.
+    if(lower==='c'){
+      e.preventDefault();
+      e.stopPropagation();
+      if(cmdInput){cmdInput.focus();announce('Command field focused.')}
+      return true;
+    }
+    if(lower==='r'){
+      e.preventDefault();
+      e.stopPropagation();
+      const cmd=normalizeSpeechLine(cmdInput?cmdInput.value:typedDraft);
+      if(cmd)announce('Command: '+cmd);
+      else announce('Command field is empty.');
       return true;
     }
     return false;
@@ -543,8 +669,14 @@ function connect(){
     let cwd='';
     try{cwd=localStorage.getItem('terminal-last-path')||''}catch(e){}
     socket.send(JSON.stringify({type:'cwd',cwd:cwd,mode:'full'}));
-    announce('Full Console connected.');
-    if(term)term.focus();
+    announce('Full Console connected. Alt+R reads the current command.');
+    // Ensure the terminal is sized and focused so PTY output is visible immediately.
+    if(fit){try{fit.fit()}catch(e){}}
+    if(term){
+      try{term.focus()}catch(e){}
+      // Nudge a redraw in case the host had zero height at first paint.
+      window.setTimeout(function(){if(fit){try{fit.fit()}catch(e){}} if(term)try{term.focus()}catch(e){}},80);
+    }
   });
   socket.addEventListener('message',function(e){
     let text=typeof e.data==='string'?e.data:String(e.data);
@@ -577,6 +709,22 @@ function connect(){
     
     term.write(text);
     appendToOutputHistory(text);
+    // When Tab was just pressed, try to learn the completed command from the next PTY rewrite.
+    // PowerShell typically rewrites the line; we take the last non-empty clean line as the new draft.
+    if(awaitingCompletion){
+      const clean=stripAnsi(text).replace(/\r/g,'\n');
+      const lines=clean.split('\n').map(function(l){return normalizeSpeechLine(l)}).filter(Boolean);
+      if(lines.length){
+        const candidate=lines[lines.length-1];
+        // Avoid treating prompt-only or pure whitespace as a completion.
+        if(candidate && candidate!==typedDraft && candidate.length>=typedDraft.length){
+          setTypedDraft(candidate);
+          announce('Completed: '+candidate);
+          awaitingCompletion=false;
+          if(awaitingCompletionTimer){clearTimeout(awaitingCompletionTimer);awaitingCompletionTimer=null}
+        }
+      }
+    }
     scheduleOutputAnnounce(text);
     if(!buffer.hidden)scheduleAutoRefresh();
   });
@@ -697,6 +845,60 @@ document.addEventListener('keydown',function(e){
   if(e.key==='Escape'&&isMenuOpen()){e.preventDefault();setMenuOpen(false);return}
   handleAppShortcut(e);
 },true);
+
+
+// --- Accessible command field (real textbox for screen readers) ---
+if(cmdInput){
+  cmdInput.addEventListener('input',function(){
+    if(syncingCmd||applyingCompletion)return;
+    typedDraft=cmdInput.value;
+    resetCompletion();
+  });
+  cmdInput.addEventListener('keydown',function(e){
+    if(e.key==='Tab'){
+      e.preventDefault();
+      requestTabCompletion(e.shiftKey?-1:1);
+      return;
+    }
+    if(e.key==='Enter'){
+      e.preventDefault();
+      runAccessibleCommand();
+      return;
+    }
+    if(e.key==='Escape'){
+      e.preventDefault();
+      setTypedDraft('');
+      resetCompletion();
+      announce('Command cleared.');
+      return;
+    }
+    // Arrow up/down: send history keys to PTY (same as interactive console)
+    if(e.key==='ArrowUp'){
+      e.preventDefault();
+      awaitingCompletion=true;
+      if(awaitingCompletionTimer)clearTimeout(awaitingCompletionTimer);
+      awaitingCompletionTimer=setTimeout(function(){awaitingCompletion=false;awaitingCompletionTimer=null},1200);
+      send('\x1b[A');
+      announce('up arrow');
+      return;
+    }
+    if(e.key==='ArrowDown'){
+      e.preventDefault();
+      awaitingCompletion=true;
+      if(awaitingCompletionTimer)clearTimeout(awaitingCompletionTimer);
+      awaitingCompletionTimer=setTimeout(function(){awaitingCompletion=false;awaitingCompletionTimer=null},1200);
+      send('\x1b[B');
+      announce('down arrow');
+      return;
+    }
+    // Other keys: reset multi-match completion cycle when editing
+    if(e.key.length===1||e.key==='Backspace'||e.key==='Delete'){
+      if(completion.matches.length)resetCompletion();
+    }
+  });
+}
+if(cmdRun)cmdRun.addEventListener('click',function(){runAccessibleCommand()});
+if(cmdClear)cmdClear.addEventListener('click',function(){setTypedDraft('');resetCompletion();if(cmdInput)cmdInput.focus();announce('Command cleared.')});
 
 init();
 })();
